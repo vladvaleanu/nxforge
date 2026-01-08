@@ -4,6 +4,7 @@
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { ModuleRegistryService } from '../services/module-registry.service';
+import { ModuleLifecycleService } from '../services/module-lifecycle.service';
 import { ModuleStatus } from '../types/module.types';
 import { requireAuth } from '../middleware/auth.middleware';
 
@@ -351,6 +352,135 @@ export async function modulesRoutes(app: FastifyInstance) {
         data: {
           message: `Module ${name} removed successfully`,
         },
+      });
+    }
+  );
+
+  /**
+   * POST /modules/:name/install
+   * Install a module (transition from REGISTERED to DISABLED)
+   */
+  app.post<{ Params: { name: string } }>(
+    '/:name/install',
+    {
+      schema: {
+        description: 'Install a module',
+        tags: ['modules'],
+        params: {
+          type: 'object',
+          required: ['name'],
+          properties: {
+            name: { type: 'string' },
+          },
+        },
+      },
+    },
+    async (request: FastifyRequest<{ Params: { name: string } }>, reply: FastifyReply) => {
+      const { name } = request.params;
+
+      const result = await ModuleLifecycleService.install(name);
+
+      if (!result.success) {
+        return reply.status(400).send({
+          success: false,
+          error: {
+            message: result.error,
+            statusCode: 400,
+          },
+        });
+      }
+
+      const module = await ModuleRegistryService.getByName(name);
+
+      return reply.send({
+        success: true,
+        data: module,
+      });
+    }
+  );
+
+  /**
+   * POST /modules/:name/enable
+   * Enable a module (make it active)
+   */
+  app.post<{ Params: { name: string } }>(
+    '/:name/enable',
+    {
+      schema: {
+        description: 'Enable a module',
+        tags: ['modules'],
+        params: {
+          type: 'object',
+          required: ['name'],
+          properties: {
+            name: { type: 'string' },
+          },
+        },
+      },
+    },
+    async (request: FastifyRequest<{ Params: { name: string } }>, reply: FastifyReply) => {
+      const { name } = request.params;
+
+      const result = await ModuleLifecycleService.enable(name);
+
+      if (!result.success) {
+        return reply.status(400).send({
+          success: false,
+          error: {
+            message: result.error,
+            statusCode: 400,
+          },
+        });
+      }
+
+      const module = await ModuleRegistryService.getByName(name);
+
+      return reply.send({
+        success: true,
+        data: module,
+      });
+    }
+  );
+
+  /**
+   * POST /modules/:name/disable
+   * Disable a module (deactivate it)
+   */
+  app.post<{ Params: { name: string } }>(
+    '/:name/disable',
+    {
+      schema: {
+        description: 'Disable a module',
+        tags: ['modules'],
+        params: {
+          type: 'object',
+          required: ['name'],
+          properties: {
+            name: { type: 'string' },
+          },
+        },
+      },
+    },
+    async (request: FastifyRequest<{ Params: { name: string } }>, reply: FastifyReply) => {
+      const { name } = request.params;
+
+      const result = await ModuleLifecycleService.disable(name);
+
+      if (!result.success) {
+        return reply.status(400).send({
+          success: false,
+          error: {
+            message: result.error,
+            statusCode: 400,
+          },
+        });
+      }
+
+      const module = await ModuleRegistryService.getByName(name);
+
+      return reply.send({
+        success: true,
+        data: module,
       });
     }
   );
