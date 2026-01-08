@@ -22,8 +22,10 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   // Register CORS
   await app.register(cors, {
-    origin: env.NODE_ENV === 'development' ? '*' : false,
+    origin: true, // Allow all origins for now (development)
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
   // Register JWT
