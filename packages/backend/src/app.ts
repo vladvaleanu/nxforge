@@ -9,6 +9,10 @@ import { env } from './config/env';
 import { logger } from './config/logger';
 import { authRoutes } from './routes/auth.routes';
 import { prisma } from './lib/prisma';
+import { ModuleLifecycleService } from './services/module-lifecycle.service';
+import { ModuleLoaderService } from './services/module-loader.service';
+import { ModuleRegistryService } from './services/module-registry.service';
+import { ModuleStatus } from './types/module.types';
 
 export async function buildApp(): Promise<FastifyInstance> {
   logger.info('Building Fastify app...');
@@ -164,6 +168,28 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   logger.info('App build complete, returning Fastify instance');
   logger.info(`Registered routes: ${app.printRoutes()}`);
+
+  // Initialize module lifecycle service with app instance
+  ModuleLifecycleService.setApp(app);
+
+  // Reload all enabled modules
+  try {
+    logger.info('Loading enabled modules...');
+    const enabledModules = await ModuleRegistryService.list({ status: ModuleStatus.ENABLED });
+
+    if (enabledModules.length > 0) {
+      await ModuleLoaderService.reloadAllModules(
+        app,
+        enabledModules.map(m => ({ name: m.name, manifest: m.manifest }))
+      );
+      logger.info(`Successfully loaded ${enabledModules.length} enabled modules`);
+    } else {
+      logger.info('No enabled modules to load');
+    }
+  } catch (error) {
+    logger.error(error, 'Failed to load enabled modules on startup');
+    // Don't throw - allow server to start even if module loading fails
+  }
 
   return app;
 }

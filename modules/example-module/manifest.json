@@ -1,0 +1,49 @@
+{
+  "name": "example-module",
+  "version": "1.0.0",
+  "displayName": "Example Module",
+  "description": "A simple example module to demonstrate dynamic route loading",
+  "author": "Automation Platform Team",
+  "license": "MIT",
+  "capabilities": {
+    "api": {
+      "routes": [
+        {
+          "method": "GET",
+          "path": "/hello",
+          "handler": "handlers/hello.handler.js",
+          "permissions": []
+        },
+        {
+          "method": "POST",
+          "path": "/echo",
+          "handler": "handlers/echo.handler.js",
+          "permissions": []
+        },
+        {
+          "method": "GET",
+          "path": "/status",
+          "handler": "handlers/status.handler.js",
+          "permissions": []
+        }
+      ]
+    }
+  },
+  "config": {
+    "schema": {
+      "greeting": {
+        "type": "string",
+        "label": "Greeting Message",
+        "description": "Custom greeting message to use",
+        "required": false
+      }
+    },
+    "defaults": {
+      "greeting": "Hello from Example Module"
+    }
+  },
+  "metadata": {
+    "tags": ["example", "demo", "testing"],
+    "category": "examples"
+  }
+}

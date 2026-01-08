@@ -3,7 +3,9 @@
  * Handles install, enable, disable, update, and remove operations
  */
 
+import { FastifyInstance } from 'fastify';
 import { ModuleRegistryService } from './module-registry.service';
+import { ModuleLoaderService } from './module-loader.service';
 import { ModuleStatus } from '../types/module.types';
 import { prisma } from '../lib/prisma';
 import fs from 'fs/promises';
@@ -11,6 +13,14 @@ import path from 'path';
 
 export class ModuleLifecycleService {
   private static MODULES_DIR = path.join(process.cwd(), 'modules');
+  private static app: FastifyInstance;
+
+  /**
+   * Initialize the lifecycle service with the Fastify app instance
+   */
+  static setApp(app: FastifyInstance): void {
+    this.app = app;
+  }
 
   /**
    * Initialize modules directory
@@ -126,8 +136,23 @@ export class ModuleLifecycleService {
       // Enable the module
       await ModuleRegistryService.updateStatus(moduleName, ModuleStatus.ENABLED);
 
-      // TODO: Load module routes, jobs, and event handlers dynamically
-      // This will be implemented in the next step
+      // Load module routes dynamically
+      if (this.app) {
+        const loadResult = await ModuleLoaderService.loadModuleRoutes(
+          this.app,
+          moduleName,
+          module.manifest
+        );
+
+        if (!loadResult.success) {
+          // Rollback to DISABLED if route loading fails
+          await ModuleRegistryService.updateStatus(moduleName, ModuleStatus.DISABLED);
+          return {
+            success: false,
+            error: `Failed to load module routes: ${loadResult.error}`,
+          };
+        }
+      }
 
       return { success: true };
     } catch (error) {
@@ -179,11 +204,13 @@ export class ModuleLifecycleService {
         };
       }
 
+      // Unload module routes
+      if (this.app) {
+        await ModuleLoaderService.unloadModuleRoutes(moduleName);
+      }
+
       // Disable the module
       await ModuleRegistryService.updateStatus(moduleName, ModuleStatus.DISABLED);
-
-      // TODO: Unload module routes, jobs, and event handlers
-      // This will be implemented in the next step
 
       return { success: true };
     } catch (error) {
