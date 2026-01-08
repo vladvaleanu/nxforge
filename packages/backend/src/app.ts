@@ -2,8 +2,7 @@
  * Fastify application setup
  */
 
-import Fastify, { FastifyInstance } from 'fastify';
-import cors from '@fastify/cors';
+import Fastify, { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import jwt from '@fastify/jwt';
 import multipart from '@fastify/multipart';
 import { env } from './config/env';
@@ -12,6 +11,8 @@ import { authRoutes } from './routes/auth.routes';
 import { prisma } from './lib/prisma';
 
 export async function buildApp(): Promise<FastifyInstance> {
+  logger.info('Building Fastify app...');
+
   const app = Fastify({
     logger,
     requestIdHeader: 'x-request-id',
@@ -20,19 +21,23 @@ export async function buildApp(): Promise<FastifyInstance> {
     trustProxy: true,
   });
 
-  // Register CORS plugin with callback for origin (better compatibility)
-  await app.register(cors, {
-    origin: (_origin: string, callback: (err: Error | null, allow: boolean) => void) => {
-      // Allow all origins in development
-      callback(null, true);
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-    exposedHeaders: ['Content-Type', 'Authorization'],
-    maxAge: 86400, // 24 hours
-    preflightContinue: false,
-    optionsSuccessStatus: 204,
+  logger.info('Fastify instance created');
+
+  // Manual CORS implementation (plugin not working in Codespaces)
+  app.addHook('onRequest', async (request: FastifyRequest, reply: FastifyReply) => {
+    const origin = request.headers.origin || '*';
+
+    reply.header('Access-Control-Allow-Origin', origin);
+    reply.header('Access-Control-Allow-Credentials', 'true');
+    reply.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+    reply.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
+    reply.header('Access-Control-Expose-Headers', 'Content-Type, Authorization');
+    reply.header('Access-Control-Max-Age', '86400');
+
+    // Handle preflight
+    if (request.method === 'OPTIONS') {
+      return reply.status(204).send();
+    }
   });
 
   // Register JWT
@@ -94,6 +99,20 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(async (instance) => {
     // Register authentication routes
     await instance.register(authRoutes, { prefix: '/auth' });
+
+    // Register module registry routes
+    try {
+      app.log.info('Attempting to import module routes...');
+      const { modulesRoutes } = await import('./routes/modules.routes');
+      app.log.info('Module routes imported successfully');
+
+      app.log.info('Registering module routes...');
+      await instance.register(modulesRoutes, { prefix: '/modules' });
+      app.log.info('Module routes registered successfully');
+    } catch (error) {
+      app.log.error(error, 'Failed to load/register module routes');
+      throw error;
+    }
   }, { prefix: '/api/v1' });
 
   // Global error handler
@@ -142,6 +161,9 @@ export async function buildApp(): Promise<FastifyInstance> {
       },
     });
   });
+
+  logger.info('App build complete, returning Fastify instance');
+  logger.info(`Registered routes: ${app.printRoutes()}`);
 
   return app;
 }

@@ -14,7 +14,13 @@
       "Bash(git rm:*)",
       "Bash(git config:*)",
       "Bash(git filter-branch:*)",
-      "Bash(git stash:*)"
+      "Bash(git stash:*)",
+      "Bash(gh codespace ports visibility:*)",
+      "Bash(npm install)",
+      "Bash(npx prisma migrate dev:*)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(cat:*)",
+      "Bash(node:*)"
     ]
   }
 }

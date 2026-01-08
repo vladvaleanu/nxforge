@@ -88,19 +88,46 @@ model Module {
   version          String
   displayName      String
   description      String?
+  author           String?
   status           ModuleStatus @default(REGISTERED)
 
-  // Module manifest
+  // Module manifest (complete manifest.json)
   manifest         Json
 
-  // Lifecycle
+  // Module configuration (user-provided config values)
+  config           Json?
+
+  // Module file path (relative to modules directory)
+  path             String?
+
+  // Lifecycle timestamps
   installedAt      DateTime?
   enabledAt        DateTime?
   disabledAt       DateTime?
   updatedAt        DateTime @updatedAt
   createdAt        DateTime @default(now())
 
+  // Relations
+  dependencies     ModuleDependency[] @relation("DependentModule")
+  dependents       ModuleDependency[] @relation("RequiredModule")
+
   @@map("modules")
+}
+
+// Module dependencies (tracks module-to-module dependencies)
+model ModuleDependency {
+  id              String   @id @default(uuid())
+  moduleId        String   // Module that depends on another
+  dependsOnId     String   // Module that is required
+  versionRange    String   // Semver range (e.g., "^1.0.0")
+
+  createdAt       DateTime @default(now())
+
+  module          Module   @relation("DependentModule", fields: [moduleId], references: [id], onDelete: Cascade)
+  dependsOn       Module   @relation("RequiredModule", fields: [dependsOnId], references: [id], onDelete: Restrict)
+
+  @@unique([moduleId, dependsOnId])
+  @@map("module_dependencies")
 }
 
 enum ModuleStatus {
