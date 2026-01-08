@@ -9,6 +9,7 @@ import multipart from '@fastify/multipart';
 import { env } from './config/env';
 import { logger } from './config/logger';
 import { authRoutes } from './routes/auth.routes';
+import { prisma } from './lib/prisma';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -56,15 +57,28 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
 
   // Readiness probe (k8s) - check dependencies
-  app.get('/health/ready', async () => {
-    // TODO: Add database and Redis connection checks
-    return {
-      status: 'ok',
-      checks: {
-        database: 'ok',
-        redis: 'ok',
-      },
-    };
+  app.get('/health/ready', async (request: any, reply: any) => {
+    const checks: Record<string, string> = {};
+
+    // Check database connection
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      checks.database = 'ok';
+    } catch (err) {
+      checks.database = 'error';
+      request.log.error(err, 'Database health check failed');
+    }
+
+    // Check Redis (placeholder for future implementation)
+    checks.redis = 'not_configured';
+
+    const allHealthy = Object.values(checks).every(status => status === 'ok' || status === 'not_configured');
+    const statusCode = allHealthy ? 200 : 503;
+
+    reply.status(statusCode).send({
+      status: allHealthy ? 'ok' : 'degraded',
+      checks,
+    });
   });
 
   // API version prefix

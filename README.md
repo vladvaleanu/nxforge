@@ -58,19 +58,29 @@ automation-platform/
 
 ## 🛠️ Getting Started
 
-### Installation
+### Quick Start
 
 ```bash
-# Clone the repository
+# 1. Clone the repository
 git clone https://github.com/vladvaleanu/automation-platform.git
 cd automation-platform
 
-# Install dependencies
+# 2. Start database services (Docker)
+docker-compose up -d
+
+# 3. Install dependencies
 npm install
 
-# Build all packages
-npm run build
+# 4. Set up backend database
+cd packages/backend
+cp .env.example .env
+npm run db:setup
+
+# 5. Start development server
+npm run dev
 ```
+
+See [Database Quick Start Guide](./docs/database-quickstart.md) for detailed setup.
 
 ### Development
 
@@ -131,6 +141,9 @@ npm run test
 ## 📚 Documentation
 
 - [Architecture Document](./DataCenter_Automation_Platform_Architecture.docx)
+- [Database Documentation](./docs/database.md)
+- [Database Quick Start](./docs/database-quickstart.md)
+- [Backend Setup Guide](./packages/backend/README.md)
 - [Module Development Guide](./docs/module-development.md) _(coming soon)_
 - [API Reference](./docs/api-reference.md) _(coming soon)_
 - [Deployment Guide](./docs/deployment.md) _(coming soon)_
