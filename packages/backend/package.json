@@ -11,7 +11,16 @@
     "test": "vitest",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:push": "prisma db push",
+    "prisma:seed": "tsx prisma/seed.ts",
+    "prisma:studio": "prisma studio",
+    "db:setup": "npm run prisma:push && npm run prisma:seed"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
     "fastify": "^4.25.2",
@@ -24,10 +33,12 @@
     "zod": "^3.22.4",
     "pino": "^8.17.2",
     "pino-pretty": "^10.3.1",
-    "dotenv": "^16.3.1"
+    "dotenv": "^16.3.1",
+    "bcrypt": "^5.1.1"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
+    "@types/bcrypt": "^5.0.2",
     "tsx": "^4.7.0",
     "typescript": "^5.3.3",
     "vitest": "^1.1.3",
