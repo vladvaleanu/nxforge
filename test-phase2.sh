@@ -100,7 +100,7 @@ RESULT=$(curl -s -X POST "${BASE_URL}/api/v1/modules/example-module/echo" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"nested":{"data":"test","array":[1,2,3]},"timestamp":"2026-01-09"}')
-NESTED_DATA=$(echo "$RESULT" | jq -r '.data.body.nested.data // "ERROR"')
+NESTED_DATA=$(echo "$RESULT" | jq -r '.data.echo.nested.data // "ERROR"')
 if [ "$NESTED_DATA" = "test" ]; then
   echo "   ✅ PASS: Complex body echoed correctly"
 else
@@ -138,7 +138,7 @@ RESULT=$(curl -s "${BASE_URL}/api/v1/modules/example-module/status" \
   -H "Authorization: Bearer $TOKEN")
 STATUS=$(echo "$RESULT" | jq -r '.data.status // "ERROR"')
 UPTIME=$(echo "$RESULT" | jq -r '.data.uptime // "ERROR"')
-if [ "$STATUS" = "enabled" ] && [ "$UPTIME" != "ERROR" ]; then
+if [ "$STATUS" = "operational" ] && [ "$UPTIME" != "ERROR" ]; then
   echo "   ✅ PASS: Status = $STATUS, Uptime = $UPTIME"
 else
   echo "   ❌ FAIL: Status endpoint not working correctly"
