@@ -183,32 +183,33 @@ example-module/
 
 These are **NOT required** for Phase 3, but could be added later:
 
-### 🔶 Nice-to-Have Features
+### 🔶 Nice-to-Have Features (Internal App Focused)
 
 1. **Module Upload UI** (Currently shows alert)
-   - File upload interface
+   - File upload interface for development team
    - Drag-and-drop support
    - Progress indicators
+   - **Note**: Low priority - developers can use API directly
 
-2. **Module Marketplace** (Future feature)
-   - Browse available modules
-   - Search and filtering
-   - Version management UI
-
-3. **Module Configuration UI** (Future feature)
+2. **Module Configuration UI** (Future feature)
    - Edit module config via UI
    - Config validation
    - Save/reset functionality
+   - **Priority**: Medium - useful for operators
 
-4. **Module Dependencies UI** (Future feature)
+3. **Module Dependencies UI** (Future feature)
    - Visualize dependency graph
    - Check dependency status
    - Install missing dependencies
+   - **Priority**: Low - simple dependencies for internal use
 
-5. **Module Logs/Monitoring** (Phase 3 feature)
+4. **Module Logs/Monitoring** (Phase 3 feature)
    - View module execution logs
    - Performance metrics
    - Error tracking
+   - **Priority**: High - will be part of Phase 3
+
+**Note**: ~~Module Marketplace~~ - **NOT NEEDED** (internal app, not a public platform)
 
 ## 7. Phase 2 Checklist
 
