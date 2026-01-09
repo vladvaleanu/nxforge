@@ -9,6 +9,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
+import ModulesPage from './pages/ModulesPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import './index.css';
 
@@ -38,6 +39,14 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <DashboardPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/modules"
+                element={
+                  <ProtectedRoute>
+                    <ModulesPage />
                   </ProtectedRoute>
                 }
               />
