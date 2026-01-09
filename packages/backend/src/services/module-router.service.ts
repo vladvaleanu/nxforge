@@ -16,7 +16,8 @@ interface EnabledModule {
 
 export class ModuleRouterService {
   private static enabledModules = new Map<string, EnabledModule>();
-  private static MODULES_DIR = path.join(process.cwd(), 'modules');
+  // Modules are in the monorepo root, not in the backend package
+  private static MODULES_DIR = path.join(process.cwd(), '..', '..', 'modules');
 
   /**
    * Enable a module and register its routes
