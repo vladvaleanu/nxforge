@@ -11,19 +11,19 @@
         {
           "method": "GET",
           "path": "/hello",
-          "handler": "handlers/hello.handler.js",
+          "handler": "handlers/hello.handler.ts",
           "permissions": []
         },
         {
           "method": "POST",
           "path": "/echo",
-          "handler": "handlers/echo.handler.js",
+          "handler": "handlers/echo.handler.ts",
           "permissions": []
         },
         {
           "method": "GET",
           "path": "/status",
-          "handler": "handlers/status.handler.js",
+          "handler": "handlers/status.handler.ts",
           "permissions": []
         }
       ]
