@@ -161,39 +161,93 @@ model AuditLog {
   @@map("audit_logs")
 }
 
-// Jobs/Tasks queue metadata
+// Phase 3: Job Scheduling System
+// Job definitions (what jobs exist and their configuration)
 model Job {
-  id          String    @id @default(uuid())
+  id          String   @id @default(uuid())
   name        String
-  moduleName  String?
-  status      JobStatus @default(PENDING)
-  priority    Int       @default(0)
+  description String?
+  moduleId    String
+  handler     String   // Path to handler function in module
+  schedule    String?  // Cron expression (null if manual only)
+  enabled     Boolean  @default(true)
+  timeout     Int      @default(300000) // 5 minutes default
+  retries     Int      @default(3)
+  config      Json?    // Job-specific configuration
 
-  payload     Json?
-  result      Json?
-  error       Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String?  // User ID who created the job
 
-  attempts    Int       @default(0)
-  maxAttempts Int       @default(3)
+  // Relations
+  executions  JobExecution[]
+  schedules   JobSchedule[]
 
-  scheduledAt DateTime?
-  startedAt   DateTime?
-  completedAt DateTime?
-  failedAt    DateTime?
-
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  @@index([status])
-  @@index([moduleName])
-  @@index([scheduledAt])
+  @@index([moduleId])
+  @@index([enabled])
   @@map("jobs")
 }
 
-enum JobStatus {
+// Job execution history (individual runs of jobs)
+model JobExecution {
+  id          String              @id @default(uuid())
+  jobId       String
+  status      JobExecutionStatus  @default(PENDING)
+  startedAt   DateTime            @default(now())
+  completedAt DateTime?
+  duration    Int?                // milliseconds
+  result      Json?               // Execution result
+  error       String?             // Error message if failed
+  logs        String?             // Execution logs
+
+  job         Job                 @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@index([status])
+  @@index([startedAt])
+  @@map("job_executions")
+}
+
+// Job schedules (cron-based scheduling)
+model JobSchedule {
+  id          String   @id @default(uuid())
+  jobId       String
+  schedule    String   // Cron expression
+  timezone    String   @default("UTC")
+  nextRun     DateTime?
+  lastRun     DateTime?
+  enabled     Boolean  @default(true)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@index([enabled])
+  @@index([nextRun])
+  @@map("job_schedules")
+}
+
+// Event system (pub/sub for module communication)
+model Event {
+  id        String   @id @default(uuid())
+  name      String   // Event name (e.g., "electricity.consumption.high")
+  source    String   // Module name or "system"
+  payload   Json     // Event data
+  createdAt DateTime @default(now())
+
+  @@index([name])
+  @@index([source])
+  @@index([createdAt])
+  @@map("events")
+}
+
+enum JobExecutionStatus {
   PENDING
   RUNNING
   COMPLETED
   FAILED
+  TIMEOUT
   CANCELLED
 }

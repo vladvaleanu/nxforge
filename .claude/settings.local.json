@@ -20,7 +20,13 @@
       "Bash(npx prisma migrate dev:*)",
       "Bash(npx tsc --noEmit)",
       "Bash(cat:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(curl:*)",
+      "Bash(jq:*)",
+      "Bash(git -C \"c:\\\\Users\\\\vlad.valeanu\\\\Desktop\\\\dev\\\\Automation Platform\" status)",
+      "Bash(git -C \"c:\\\\Users\\\\vlad.valeanu\\\\Desktop\\\\dev\\\\Automation Platform\" diff README.md)",
+      "Bash(git -C \"c:\\\\Users\\\\vlad.valeanu\\\\Desktop\\\\dev\\\\Automation Platform\" commit -m \"$\\(cat <<''EOF''\ndocs: finalize Phase 2 documentation and prepare Phase 3\n\n- README.md: Complete update showing Phase 1 & 2 complete, Phase 3 next\n  - Updated roadmap with completion status and documentation links\n  - Added current status section \\(v2.0.0, ready for Phase 3\\)\n  - Added implemented features breakdown\n  - Added API endpoints summary\n  - Expanded documentation section\n  - Added testing, security, and performance sections\n  - Updated acknowledgments and tech stack\n\n- PHASE2_REVIEW.md: Verified ready for Phase 3 \\(already committed\\)\n\n- PHASE3_PLAN.md: Created comprehensive 4-week implementation plan \\(already committed\\)\n\nAll Phase 2 features complete:\n- Backend: 11/11 tests passing\n- Frontend: All features working \\(dark mode, module management\\)\n- Documentation: Complete and up to date\n\nReady to begin Phase 3: Automation Runtime\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git -C \"c:\\\\Users\\\\vlad.valeanu\\\\Desktop\\\\dev\\\\Automation Platform\" push origin main)"
     ]
   }
 }
