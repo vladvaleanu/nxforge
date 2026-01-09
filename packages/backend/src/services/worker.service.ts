@@ -123,6 +123,23 @@ export class WorkerService {
       bullJobId: bullJob.id,
     });
 
+    // Check if job still exists in database
+    const job = await prisma.job.findUnique({
+      where: { id: jobId },
+    });
+
+    if (!job) {
+      logger.warn(`Job ${jobId} not found in database - removing from queue`, {
+        jobId,
+        bullJobId: bullJob.id,
+      });
+
+      // Remove this orphaned job from the queue
+      await bullJob.remove();
+
+      throw new Error(`Job ${jobId} no longer exists in database`);
+    }
+
     // Create execution record
     const execution = await prisma.jobExecution.create({
       data: {

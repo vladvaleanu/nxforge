@@ -113,6 +113,38 @@ export class JobSchedulerService {
   }
 
   /**
+   * Clean up orphaned jobs in Redis that don't exist in database
+   */
+  async cleanupOrphanedJobs(): Promise<{ removed: number }> {
+    try {
+      // Get all jobs from database
+      const dbJobs = await prisma.job.findMany({
+        select: { id: true },
+      });
+      const dbJobIds = new Set(dbJobs.map(j => j.id));
+
+      // Get all repeatable jobs from Redis
+      const repeatableJobs = await jobQueueService.queue.getRepeatableJobs();
+
+      let removed = 0;
+      for (const job of repeatableJobs) {
+        // Extract job ID from the job key or name
+        const jobId = job.id;
+
+        if (jobId && !dbJobIds.has(jobId)) {
+          // Job exists in Redis but not in database - remove it
+          await jobQueueService.queue.removeRepeatableByKey(job.key);
+          removed++;
+        }
+      }
+
+      return { removed };
+    } catch (error: any) {
+      throw new Error(`Failed to cleanup orphaned jobs: ${error.message}`);
+    }
+  }
+
+  /**
    * Update schedule's next run time after execution
    */
   async updateScheduleAfterRun(scheduleId: string): Promise<void> {

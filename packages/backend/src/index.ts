@@ -27,6 +27,15 @@ async function start() {
     await workerService.start();
     logger.info('Worker pool started');
 
+    // Clean up orphaned jobs from Redis
+    logger.info('Cleaning up orphaned jobs...');
+    const cleanup = await jobSchedulerService.cleanupOrphanedJobs();
+    if (cleanup.removed > 0) {
+      logger.info(`Removed ${cleanup.removed} orphaned job(s) from queue`);
+    } else {
+      logger.info('No orphaned jobs found');
+    }
+
     // Initialize scheduled jobs
     logger.info('Initializing job schedules...');
     await jobSchedulerService.initializeSchedules();
