@@ -93,6 +93,9 @@ export default function CreateJobPage() {
   const handleModuleChange = (moduleId: string) => {
     setFormData({ ...formData, moduleId, handler: '' });
     const module = modules.find(m => m.id === moduleId);
+    console.log('Selected module:', module);
+    console.log('Module manifest:', module?.manifest);
+    console.log('Module jobs:', module?.manifest?.jobs);
     setSelectedModuleHandlers(module?.manifest?.jobs || []);
   };
 
