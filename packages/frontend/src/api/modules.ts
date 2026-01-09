@@ -38,7 +38,7 @@ export const modulesApi = {
     if (params?.search) searchParams.append('search', params.search);
 
     const query = searchParams.toString();
-    const url = `/api/v1/modules${query ? `?${query}` : ''}`;
+    const url = `/modules${query ? `?${query}` : ''}`;
 
     const response = await apiClient.get<ModulesResponse>(url);
     return response.data;
@@ -48,7 +48,7 @@ export const modulesApi = {
    * Get module details by name
    */
   get: async (name: string): Promise<Module> => {
-    const response = await apiClient.get<ModuleResponse>(`/api/v1/modules/${name}`);
+    const response = await apiClient.get<ModuleResponse>(`/modules/${name}`);
     return response.data;
   },
 
@@ -56,7 +56,7 @@ export const modulesApi = {
    * Register a new module
    */
   register: async (manifest: ModuleManifest): Promise<Module> => {
-    const response = await apiClient.post<ModuleResponse>('/api/v1/modules', {
+    const response = await apiClient.post<ModuleResponse>('/modules', {
       manifest,
     });
     return response.data;
@@ -67,7 +67,7 @@ export const modulesApi = {
    */
   updateStatus: async (name: string, status: ModuleStatus): Promise<Module> => {
     const response = await apiClient.put<ModuleResponse>(
-      `/api/v1/modules/${name}/status`,
+      `/modules/${name}/status`,
       { status }
     );
     return response.data;
@@ -78,7 +78,7 @@ export const modulesApi = {
    */
   enable: async (name: string): Promise<Module> => {
     const response = await apiClient.post<ModuleResponse>(
-      `/api/v1/modules/${name}/enable`
+      `/modules/${name}/enable`
     );
     return response.data;
   },
@@ -88,7 +88,7 @@ export const modulesApi = {
    */
   disable: async (name: string): Promise<Module> => {
     const response = await apiClient.post<ModuleResponse>(
-      `/api/v1/modules/${name}/disable`
+      `/modules/${name}/disable`
     );
     return response.data;
   },
@@ -98,7 +98,7 @@ export const modulesApi = {
    */
   updateConfig: async (name: string, config: Record<string, any>): Promise<Module> => {
     const response = await apiClient.put<ModuleResponse>(
-      `/api/v1/modules/${name}/config`,
+      `/modules/${name}/config`,
       { config }
     );
     return response.data;
@@ -108,7 +108,7 @@ export const modulesApi = {
    * Remove a module
    */
   remove: async (name: string): Promise<void> => {
-    await apiClient.delete(`/api/v1/modules/${name}`);
+    await apiClient.delete(`/modules/${name}`);
   },
 
   /**
@@ -116,7 +116,7 @@ export const modulesApi = {
    */
   validate: async (manifest: ModuleManifest): Promise<{ valid: boolean; errors?: string[] }> => {
     const response = await apiClient.post<{ success: boolean; data: { valid: boolean; errors?: string[] } }>(
-      '/api/v1/modules/validate',
+      '/modules/validate',
       { manifest }
     );
     return response.data;
