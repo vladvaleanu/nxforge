@@ -112,25 +112,45 @@ SUCCESS=$(echo $RESPONSE | grep -o '"success":[^,]*' | cut -d':' -f2)
 if [ "$SUCCESS" = "true" ]; then
   echo "✅ Module registered successfully!"
   echo ""
-  echo "Now enable the module:"
 
-  ENABLE_RESPONSE=$(curl -s -X POST "$API_URL/modules/data-sync-module/enable" \
+  # Step 1: Install the module
+  echo "Installing module..."
+  INSTALL_RESPONSE=$(curl -s -X POST "$API_URL/modules/data-sync-module/install" \
     -H "Authorization: Bearer $ACCESS_TOKEN")
 
-  echo "Enable Response:"
-  echo "$ENABLE_RESPONSE"
+  echo "Install Response:"
+  echo "$INSTALL_RESPONSE"
   echo ""
 
-  ENABLE_SUCCESS=$(echo $ENABLE_RESPONSE | grep -o '"success":[^,]*' | cut -d':' -f2)
+  INSTALL_SUCCESS=$(echo $INSTALL_RESPONSE | grep -o '"success":[^,]*' | cut -d':' -f2)
 
-  if [ "$ENABLE_SUCCESS" = "true" ]; then
-    echo "✅ Module enabled!"
+  if [ "$INSTALL_SUCCESS" = "true" ]; then
+    echo "✅ Module installed!"
     echo ""
-    echo "🎉 Done! Now go to the 'Create Job' page and:"
-    echo "   1. Select 'Data Sync Module' from the dropdown"
-    echo "   2. You'll see 3 job types appear!"
+
+    # Step 2: Enable the module
+    echo "Enabling module..."
+    ENABLE_RESPONSE=$(curl -s -X POST "$API_URL/modules/data-sync-module/enable" \
+      -H "Authorization: Bearer $ACCESS_TOKEN")
+
+    echo "Enable Response:"
+    echo "$ENABLE_RESPONSE"
+    echo ""
+
+    ENABLE_SUCCESS=$(echo $ENABLE_RESPONSE | grep -o '"success":[^,]*' | cut -d':' -f2)
+
+    if [ "$ENABLE_SUCCESS" = "true" ]; then
+      echo "✅ Module enabled!"
+      echo ""
+      echo "🎉 Done! Now go to the 'Create Job' page and:"
+      echo "   1. Select 'Data Sync Module' from the dropdown"
+      echo "   2. You'll see 3 job types appear!"
+    else
+      echo "⚠️  Module installed but enable failed"
+      echo "Error details in response above"
+    fi
   else
-    echo "⚠️  Module registered but enable failed"
+    echo "⚠️  Module registered but install failed"
     echo "Error details in response above"
   fi
 else
