@@ -139,21 +139,20 @@ npm run test
 
 ### 🚀 Phase 3: Automation Runtime (NEXT)
 - [ ] Job scheduler with BullMQ & Cron
-- [ ] Worker pool for isolated execution
-- [ ] Event bus for module communication
+- [ ] Worker pool for isolated execution with process isolation
+- [ ] Browser automation with Playwright & container sandboxing
+- [ ] Event bus for cross-module communication with Redis pub/sub
 - [ ] Job execution monitoring & logs
-- [ ] Jobs management UI
-- [ ] Real-time status updates
+- [ ] Jobs management UI with real-time updates
+- [ ] WebSocket support for live status updates
 
 **Status**: 📋 Planned | [Implementation Plan](./PHASE3_PLAN.md)
 
-**Estimated Duration**: 4 weeks
-
 ### 🔄 Phase 4: Consumption Monitor
-- [ ] Endpoint management
-- [ ] Scraping engine
-- [ ] Time-series storage
-- [ ] Real-time dashboards
+- [ ] Endpoint management for data center metrics
+- [ ] Time-series storage with TimescaleDB
+- [ ] Real-time dashboards for consumption monitoring
+- [ ] Alert system based on thresholds
 
 ### 🔄 Phase 5: Production Hardening
 - [ ] Security audit & hardening
