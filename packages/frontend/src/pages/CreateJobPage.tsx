@@ -69,7 +69,7 @@ export default function CreateJobPage() {
     },
   });
 
-  const modules: Module[] = modulesData?.data || [];
+  const modules: Module[] = (modulesData?.data || []).filter((m: Module) => m.status === 'ENABLED');
 
   // Create job mutation
   const createJobMutation = useMutation({
