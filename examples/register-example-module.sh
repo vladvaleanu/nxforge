@@ -94,6 +94,10 @@ RESPONSE=$(curl -s -X POST "$API_URL/modules" \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
   -d "{\"manifest\":$MANIFEST}")
 
+echo "API Response:"
+echo "$RESPONSE"
+echo ""
+
 SUCCESS=$(echo $RESPONSE | grep -o '"success":[^,]*' | cut -d':' -f2)
 
 if [ "$SUCCESS" = "true" ]; then
@@ -103,6 +107,10 @@ if [ "$SUCCESS" = "true" ]; then
 
   ENABLE_RESPONSE=$(curl -s -X POST "$API_URL/modules/data-sync-module/enable" \
     -H "Authorization: Bearer $ACCESS_TOKEN")
+
+  echo "Enable Response:"
+  echo "$ENABLE_RESPONSE"
+  echo ""
 
   ENABLE_SUCCESS=$(echo $ENABLE_RESPONSE | grep -o '"success":[^,]*' | cut -d':' -f2)
 
@@ -114,8 +122,9 @@ if [ "$SUCCESS" = "true" ]; then
     echo "   2. You'll see 3 job types appear!"
   else
     echo "⚠️  Module registered but enable failed"
+    echo "Error details in response above"
   fi
 else
-  echo "❌ Registration failed:"
-  echo "$RESPONSE" | grep -o '"error":"[^"]*"' | cut -d'"' -f4
+  echo "❌ Registration failed"
+  echo "Error details in response above"
 fi
