@@ -1,4 +1,5 @@
 /**
+import toast from 'react-hot-toast';
  * Create Job Page - Form to create new automation jobs
  */
 
@@ -82,11 +83,11 @@ export default function CreateJobPage() {
       return response.data;
     },
     onSuccess: () => {
-      alert('Job created successfully');
+      toast.success('Job created successfully');
       navigate('/jobs');
     },
     onError: (error: any) => {
-      alert(`Failed to create job: ${error.response?.data?.error || error.message}`);
+      toast.error(`Failed to create job: ${error.response?.data?.error || error.message}`);
     },
   });
 
@@ -121,7 +122,7 @@ export default function CreateJobPage() {
     try {
       JSON.parse(formData.config);
     } catch (err) {
-      alert('Invalid JSON in config field');
+      toast.error('Invalid JSON in config field');
       return;
     }
 

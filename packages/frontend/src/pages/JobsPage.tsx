@@ -5,6 +5,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import Layout from '../components/Layout';
 import axios from 'axios';
 
@@ -75,10 +76,10 @@ export default function JobsPage() {
       return response.data;
     },
     onSuccess: () => {
-      alert('Job queued for execution');
+      toast.success('Job queued for execution');
     },
     onError: (error: any) => {
-      alert(`Failed to execute job: ${error.response?.data?.error || error.message}`);
+      toast.error(`Failed to execute job: ${error.response?.data?.error || error.message}`);
     },
   });
 
@@ -93,11 +94,12 @@ export default function JobsPage() {
       });
       return response.data;
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['jobs'] });
+      toast.success(`Job ${variables.enabled ? 'disabled' : 'enabled'} successfully`);
     },
     onError: (error: any) => {
-      alert(`Failed to toggle job: ${error.response?.data?.error || error.message}`);
+      toast.error(`Failed to toggle job: ${error.response?.data?.error || error.message}`);
     },
   });
 
@@ -113,10 +115,10 @@ export default function JobsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['jobs'] });
-      alert('Job deleted successfully');
+      toast.success('Job deleted successfully');
     },
     onError: (error: any) => {
-      alert(`Failed to delete job: ${error.response?.data?.error || error.message}`);
+      toast.error(`Failed to delete job: ${error.response?.data?.error || error.message}`);
     },
   });
 

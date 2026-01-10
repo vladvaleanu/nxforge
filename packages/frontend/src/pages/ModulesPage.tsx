@@ -1,4 +1,5 @@
 /**
+import toast from 'react-hot-toast';
  * Modules management page
  * Lists and manages installed modules
  */
@@ -14,7 +15,7 @@ export default function ModulesPage() {
   const [selectedModule, setSelectedModule] = useState<Module | null>(null);
 
   const handleInstallModule = () => {
-    alert('Module installation UI coming soon! For now, modules can be registered via API.');
+    toast.success('Module installation UI coming soon! For now, modules can be registered via API.');
   };
 
   // Fetch modules
