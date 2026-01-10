@@ -1,9 +1,9 @@
 /**
-import toast from 'react-hot-toast';
  * Create Job Page - Form to create new automation jobs
  */
 
 import { useState } from 'react';
+import toast from 'react-hot-toast';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';

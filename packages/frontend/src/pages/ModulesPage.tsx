@@ -1,10 +1,10 @@
 /**
-import toast from 'react-hot-toast';
  * Modules management page
  * Lists and manages installed modules
  */
 
 import { useState } from 'react';
+import toast from 'react-hot-toast';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { modulesApi } from '../api/modules';
 import { Module, ModuleStatus } from '../types/module.types';
