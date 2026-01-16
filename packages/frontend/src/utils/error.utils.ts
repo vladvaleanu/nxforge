@@ -75,7 +75,7 @@ export function getErrorMessage(error: unknown): string {
  * Check if error is an Axios error
  */
 function isAxiosError(error: unknown): error is AxiosError {
-  return (error as AxiosError).isAxiosError === true;
+  return error != null && (error as AxiosError).isAxiosError === true;
 }
 
 /**
