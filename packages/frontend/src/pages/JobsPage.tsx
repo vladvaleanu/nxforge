@@ -138,7 +138,7 @@ export default function JobsPage() {
     return moduleMap.get(moduleId) || moduleId;
   }, [moduleMap]);
 
-  const handleExecute = (jobId: string, jobName: string) => {
+  const handleExecute = useCallback((jobId: string, jobName: string) => {
     confirm(
       () => executeJobMutation.mutateAsync(jobId),
       {
@@ -148,13 +148,13 @@ export default function JobsPage() {
         variant: 'info',
       }
     );
-  };
+  }, [confirm, executeJobMutation]);
 
-  const handleToggle = (job: Job) => {
+  const handleToggle = useCallback((job: Job) => {
     toggleJobMutation.mutate({ jobId: job.id, enabled: job.enabled });
-  };
+  }, [toggleJobMutation]);
 
-  const handleDelete = (jobId: string, jobName: string) => {
+  const handleDelete = useCallback((jobId: string, jobName: string) => {
     confirm(
       () => deleteJobMutation.mutateAsync(jobId),
       {
@@ -164,7 +164,7 @@ export default function JobsPage() {
         variant: 'danger',
       }
     );
-  };
+  }, [confirm, deleteJobMutation]);
 
   return (
     <div className="p-8">

@@ -66,12 +66,10 @@ const coreMenuItems: MenuItem[] = [
  * Build complete menu from core items + module items
  */
 function buildMenu(): MenuItem[] {
-  console.log("[Sidebar] Building menu...");
   const menu = [...coreMenuItems];
 
   // Get module sidebar configs
   const moduleSidebarConfigs = moduleLoaderService.getSidebarConfig();
-  console.log("[Sidebar] Module sidebar configs:", moduleSidebarConfigs);
 
   // Add each module's sidebar items
   for (const config of moduleSidebarConfigs) {
@@ -121,7 +119,6 @@ function Sidebar() {
 
     // Listen for module changes event (event-driven updates only)
     const handleModulesChanged = () => {
-      console.log('[Sidebar] Modules changed event received, reloading...');
       moduleLoaderService.reload().then(() => {
         updateMenu();
       });

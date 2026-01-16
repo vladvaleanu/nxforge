@@ -3,7 +3,7 @@
  * Lists and manages installed modules
  */
 
-import { useState } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { modulesApi } from '../api/modules';
 import { Module, ModuleStatus } from '../types/module.types';
@@ -26,21 +26,19 @@ export default function ModulesPage() {
   const { data: modulesData, isLoading, error } = useQuery({
     queryKey: ['modules'],
     queryFn: async () => {
-      try {
-        const result = await modulesApi.list();
-        console.log('Modules loaded:', result);
-        return result;
-      } catch (err) {
-        console.error('Failed to load modules:', err);
-        throw err;
-      }
+      return modulesApi.list();
     },
   });
 
   const modules: Module[] = Array.isArray(modulesData) ? modulesData : [];
 
-  // Log module data for debugging
-  console.log('[ModulesPage] Modules data:', modules.map(m => ({ name: m.name, status: m.status })));
+  // Memoize module counts to avoid recalculating on every render
+  const moduleCounts = useMemo(() => ({
+    total: modules.length,
+    enabled: modules.filter(m => m.status === ModuleStatus.ENABLED).length,
+    disabled: modules.filter(m => m.status === ModuleStatus.DISABLED).length,
+    registered: modules.filter(m => m.status === ModuleStatus.REGISTERED).length,
+  }), [modules]);
 
   // Enable module mutation
   const enableMutation = useMutation({
@@ -72,27 +70,26 @@ export default function ModulesPage() {
     },
   });
 
-  const getStatusBadge = (status: ModuleStatus) => {
-    const styles = {
-      [ModuleStatus.ENABLED]: 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400',
-      [ModuleStatus.DISABLED]: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
-      [ModuleStatus.REGISTERED]: 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400',
-      [ModuleStatus.INSTALLING]: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400',
-      [ModuleStatus.UPDATING]: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400',
-      [ModuleStatus.REMOVING]: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400',
-      [ModuleStatus.ERROR]: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400',
-    };
+  // Move status styles outside component to avoid recreation
+  const STATUS_STYLES = useMemo(() => ({
+    [ModuleStatus.ENABLED]: 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400',
+    [ModuleStatus.DISABLED]: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
+    [ModuleStatus.REGISTERED]: 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400',
+    [ModuleStatus.INSTALLING]: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400',
+    [ModuleStatus.UPDATING]: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400',
+    [ModuleStatus.REMOVING]: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400',
+    [ModuleStatus.ERROR]: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400',
+  }), []);
 
+  const getStatusBadge = useCallback((status: ModuleStatus) => {
     return (
-      <span className={`px-2 py-1 text-xs font-medium rounded-full ${styles[status]}`}>
+      <span className={`px-2 py-1 text-xs font-medium rounded-full ${STATUS_STYLES[status]}`}>
         {status}
       </span>
     );
-  };
+  }, [STATUS_STYLES]);
 
   const handleToggleModule = (module: Module) => {
-    console.log('[ModulesPage] Toggle module:', module.name, 'current status:', module.status);
-
     if (module.status === ModuleStatus.ENABLED) {
       // Disabling - use warning variant
       confirm(
@@ -174,24 +171,24 @@ export default function ModulesPage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
           <div className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Modules</div>
-          <div className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">{modules.length}</div>
+          <div className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">{moduleCounts.total}</div>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
           <div className="text-sm font-medium text-gray-600 dark:text-gray-400">Enabled</div>
           <div className="mt-1 text-2xl font-semibold text-green-600 dark:text-green-400">
-            {modules.filter(m => m.status === ModuleStatus.ENABLED).length}
+            {moduleCounts.enabled}
           </div>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
           <div className="text-sm font-medium text-gray-600 dark:text-gray-400">Disabled</div>
           <div className="mt-1 text-2xl font-semibold text-gray-600 dark:text-gray-400">
-            {modules.filter(m => m.status === ModuleStatus.DISABLED).length}
+            {moduleCounts.disabled}
           </div>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
           <div className="text-sm font-medium text-gray-600 dark:text-gray-400">Registered</div>
           <div className="mt-1 text-2xl font-semibold text-blue-600 dark:text-blue-400">
-            {modules.filter(m => m.status === ModuleStatus.REGISTERED).length}
+            {moduleCounts.registered}
           </div>
         </div>
       </div>

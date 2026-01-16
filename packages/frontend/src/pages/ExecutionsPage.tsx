@@ -51,6 +51,7 @@ export default function ExecutionsPage() {
       return response.data;
     },
     refetchInterval: 5000, // Auto-refresh every 5 seconds
+    refetchIntervalInBackground: false, // Don't refetch when tab is hidden (saves bandwidth & battery)
   });
 
   const executions: Execution[] = executionsData?.data || [];
