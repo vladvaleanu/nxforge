@@ -97,16 +97,21 @@ docker-compose up -d
 # 3. Install dependencies
 npm install
 
-# 4. Set up backend database
+# 4. Build shared packages
+cd packages/core
+npm run build
+cd ../..
+
+# 5. Set up backend database
 cd packages/backend
 cp .env.example .env
 npm run db:setup
 
-# 5. Start backend (Terminal 1)
+# 6. Start backend (Terminal 1)
 npm run dev
 
-# 6. Start frontend (Terminal 2)
-cd packages/frontend
+# 7. Start frontend (Terminal 2)
+cd ../frontend
 npm run dev
 ```
 
