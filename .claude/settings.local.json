@@ -77,7 +77,8 @@
       "Bash(npm uninstall:*)",
       "Bash(npm --version:*)",
       "Bash(npm test:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(git remote set-url:*)"
     ]
   }
 }
