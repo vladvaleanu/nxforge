@@ -4,7 +4,7 @@
  */
 
 import { useState, useMemo, useCallback } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tantml:react-query';
 import { modulesApi } from '../api/modules';
 import { Module, ModuleStatus } from '../types/module.types';
 import { getErrorMessage } from '../utils/error.utils';
@@ -12,8 +12,9 @@ import { showError, showSuccess, showInfo } from '../utils/toast.utils';
 import { SkeletonLoader } from '../components/LoadingSpinner';
 import { useConfirm } from '../hooks/useConfirm';
 import ConfirmModal from '../components/ConfirmModal';
+import ErrorBoundary from '../components/ErrorBoundary';
 
-export default function ModulesPage() {
+function ModulesPageContent() {
   const queryClient = useQueryClient();
   const [selectedModule, setSelectedModule] = useState<Module | null>(null);
   const { confirm, confirmState, handleConfirm, handleClose } = useConfirm();
@@ -355,5 +356,33 @@ export default function ModulesPage() {
         isLoading={confirmState.isLoading}
       />
     </div>
+  );
+}
+
+// Wrap with ErrorBoundary to prevent module rendering errors from crashing the app
+export default function ModulesPage() {
+  return (
+    <ErrorBoundary
+      fallback={
+        <div className="p-8">
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
+            <h2 className="text-lg font-semibold text-red-900 dark:text-red-100 mb-2">
+              Failed to load modules page
+            </h2>
+            <p className="text-sm text-red-700 dark:text-red-300 mb-4">
+              There was an error loading the modules. Please try refreshing the page.
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+            >
+              Refresh Page
+            </button>
+          </div>
+        </div>
+      }
+    >
+      <ModulesPageContent />
+    </ErrorBoundary>
   );
 }

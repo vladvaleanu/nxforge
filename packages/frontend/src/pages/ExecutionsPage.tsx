@@ -2,11 +2,12 @@
  * Executions Page - View job execution history
  */
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { formatDistanceToNow } from 'date-fns';
+import ErrorBoundary from '../components/ErrorBoundary';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1';
 
@@ -28,7 +29,7 @@ interface Execution {
   };
 }
 
-export default function ExecutionsPage() {
+function ExecutionsPageContent() {
   const { jobId } = useParams();
   const [statusFilter, setStatusFilter] = useState<ExecutionStatus | 'all'>('all');
   const [page, setPage] = useState(1);
@@ -57,22 +58,18 @@ export default function ExecutionsPage() {
   const executions: Execution[] = executionsData?.data || [];
   const pagination = executionsData?.pagination;
 
+  // Memoize status colors to avoid recreating on every render
+  const STATUS_COLORS = useMemo(() => ({
+    COMPLETED: 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400',
+    RUNNING: 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400',
+    FAILED: 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400',
+    TIMEOUT: 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400',
+    CANCELLED: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-400',
+    PENDING: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400',
+  } as const), []);
+
   const getStatusColor = (status: ExecutionStatus) => {
-    switch (status) {
-      case 'COMPLETED':
-        return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400';
-      case 'RUNNING':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400';
-      case 'FAILED':
-        return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400';
-      case 'TIMEOUT':
-        return 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400';
-      case 'CANCELLED':
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-400';
-      case 'PENDING':
-      default:
-        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400';
-    }
+    return STATUS_COLORS[status] || STATUS_COLORS.PENDING;
   };
 
   const formatDuration = (ms?: number) => {
@@ -240,7 +237,35 @@ export default function ExecutionsPage() {
           </>
         )}
       </div>
-    
+
     </div>
+  );
+}
+
+// Wrap with ErrorBoundary to prevent execution rendering errors from crashing the app
+export default function ExecutionsPage() {
+  return (
+    <ErrorBoundary
+      fallback={
+        <div className="p-8">
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
+            <h2 className="text-lg font-semibold text-red-900 dark:text-red-100 mb-2">
+              Failed to load executions
+            </h2>
+            <p className="text-sm text-red-700 dark:text-red-300 mb-4">
+              There was an error loading the execution history. Please try refreshing the page.
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+            >
+              Refresh Page
+            </button>
+          </div>
+        </div>
+      }
+    >
+      <ExecutionsPageContent />
+    </ErrorBoundary>
   );
 }

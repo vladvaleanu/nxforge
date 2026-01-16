@@ -70,6 +70,12 @@ export const jobsRoutes: FastifyPluginAsync = async (fastify) => {
         where,
         include: {
           schedules: true,
+          module: {
+            select: {
+              name: true,
+              displayName: true,
+            },
+          },
           _count: {
             select: { executions: true },
           },

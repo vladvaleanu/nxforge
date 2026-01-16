@@ -2,7 +2,7 @@
  * Jobs Page - List and manage automation jobs
  */
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useCallback, memo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
@@ -19,6 +19,10 @@ interface Job {
   name: string;
   description?: string;
   moduleId: string;
+  module?: {
+    name: string;
+    displayName: string;
+  };
   handler: string;
   schedule?: string;
   enabled: boolean;
@@ -29,10 +33,75 @@ interface Job {
   updatedAt: string;
 }
 
-interface Module {
-  id: string;
-  name: string;
+interface JobRowProps {
+  job: Job;
+  onExecute: (jobId: string, jobName: string) => void;
+  onToggle: (job: Job) => void;
+  onDelete: (jobId: string, jobName: string) => void;
 }
+
+const JobRow = memo(({ job, onExecute, onToggle, onDelete }: JobRowProps) => {
+  return (
+    <tr>
+      <td className="px-6 py-4">
+        <div className="text-sm font-medium text-gray-900 dark:text-white">
+          {job.name}
+        </div>
+        {job.description && (
+          <div className="text-sm text-gray-500 dark:text-gray-400">
+            {job.description}
+          </div>
+        )}
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+        {job.module?.name || job.moduleId}
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+        {job.schedule || 'Manual'}
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap">
+        <span
+          className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+            job.enabled
+              ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
+              : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-400'
+          }`}
+        >
+          {job.enabled ? 'Enabled' : 'Disabled'}
+        </span>
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+        <button
+          onClick={() => onExecute(job.id, job.name)}
+          disabled={!job.enabled}
+          className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Run
+        </button>
+        <button
+          onClick={() => onToggle(job)}
+          className="text-yellow-600 hover:text-yellow-900 dark:text-yellow-400 dark:hover:text-yellow-300"
+        >
+          {job.enabled ? 'Disable' : 'Enable'}
+        </button>
+        <Link
+          to={`/jobs/${job.id}/executions`}
+          className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300"
+        >
+          History
+        </Link>
+        <button
+          onClick={() => onDelete(job.id, job.name)}
+          className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+        >
+          Delete
+        </button>
+      </td>
+    </tr>
+  );
+});
+
+JobRow.displayName = 'JobRow';
 
 export default function JobsPage() {
   const queryClient = useQueryClient();
@@ -48,19 +117,6 @@ export default function JobsPage() {
       if (filter === 'disabled') params.append('enabled', 'false');
 
       const response = await axios.get(`${API_URL}/jobs?${params}`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
-        },
-      });
-      return response.data;
-    },
-  });
-
-  // Fetch modules for display
-  const { data: modulesData } = useQuery({
-    queryKey: ['modules'],
-    queryFn: async () => {
-      const response = await axios.get(`${API_URL}/modules`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('accessToken')}`,
         },
@@ -127,16 +183,6 @@ export default function JobsPage() {
   });
 
   const jobs: Job[] = jobsData?.data || [];
-  const modules: Module[] = modulesData?.data || [];
-
-  // Create a Map for O(1) module lookup instead of O(n) find on every row
-  const moduleMap = useMemo(() => {
-    return new Map(modules.map(m => [m.id, m.name]));
-  }, [modules]);
-
-  const getModuleName = useCallback((moduleId: string) => {
-    return moduleMap.get(moduleId) || moduleId;
-  }, [moduleMap]);
 
   const handleExecute = useCallback((jobId: string, jobName: string) => {
     confirm(
@@ -256,62 +302,13 @@ export default function JobsPage() {
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {jobs.map((job) => (
-                  <tr key={job.id}>
-                    <td className="px-6 py-4">
-                      <div className="text-sm font-medium text-gray-900 dark:text-white">
-                        {job.name}
-                      </div>
-                      {job.description && (
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
-                          {job.description}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {getModuleName(job.moduleId)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {job.schedule || 'Manual'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          job.enabled
-                            ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
-                            : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-400'
-                        }`}
-                      >
-                        {job.enabled ? 'Enabled' : 'Disabled'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                      <button
-                        onClick={() => handleExecute(job.id, job.name)}
-                        disabled={!job.enabled}
-                        className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Run
-                      </button>
-                      <button
-                        onClick={() => handleToggle(job)}
-                        className="text-yellow-600 hover:text-yellow-900 dark:text-yellow-400 dark:hover:text-yellow-300"
-                      >
-                        {job.enabled ? 'Disable' : 'Enable'}
-                      </button>
-                      <Link
-                        to={`/jobs/${job.id}/executions`}
-                        className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300"
-                      >
-                        History
-                      </Link>
-                      <button
-                        onClick={() => handleDelete(job.id, job.name)}
-                        className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                      >
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
+                  <JobRow
+                    key={job.id}
+                    job={job}
+                    onExecute={handleExecute}
+                    onToggle={handleToggle}
+                    onDelete={handleDelete}
+                  />
                 ))}
               </tbody>
             </table>

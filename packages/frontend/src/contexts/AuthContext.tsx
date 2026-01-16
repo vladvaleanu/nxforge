@@ -6,6 +6,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { authApi, User } from '../api/auth';
 import { moduleLoaderService } from '../services/module-loader.service';
+import { tokenStorage } from '../utils/token-storage.utils';
 
 interface AuthContextType {
   user: User | null;
@@ -25,7 +26,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Check if user is authenticated on mount
   useEffect(() => {
     const checkAuth = async () => {
-      const token = localStorage.getItem('accessToken');
+      const token = tokenStorage.getAccessToken();
       if (token) {
         try {
           const response = await authApi.getCurrentUser();
@@ -40,8 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // Don't block authentication if module loading fails
           }
         } catch (error) {
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
+          tokenStorage.clearTokens();
         }
       }
       setIsLoading(false);
@@ -54,8 +54,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const response = await authApi.login({ email, password });
     const { accessToken, refreshToken } = response.data;
 
-    localStorage.setItem('accessToken', accessToken);
-    localStorage.setItem('refreshToken', refreshToken);
+    tokenStorage.setAccessToken(accessToken);
+    tokenStorage.setRefreshToken(refreshToken);
 
     const userResponse = await authApi.getCurrentUser();
     setUser(userResponse.data.user);
@@ -83,7 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    const refreshToken = localStorage.getItem('refreshToken');
+    const refreshToken = tokenStorage.getRefreshToken();
     if (refreshToken) {
       try {
         await authApi.logout(refreshToken);
@@ -92,8 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
+    tokenStorage.clearTokens();
     setUser(null);
 
     // Reset modules on logout

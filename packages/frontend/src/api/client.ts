@@ -4,6 +4,7 @@
 
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import { formatErrorForLogging } from '../utils/error.utils';
+import { tokenStorage } from '../utils/token-storage.utils';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1';
 
@@ -62,7 +63,7 @@ class ApiClient {
     // Request interceptor - add auth token
     this.client.interceptors.request.use(
       (config) => {
-        const token = localStorage.getItem('accessToken');
+        const token = tokenStorage.getAccessToken();
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
         }
@@ -86,7 +87,7 @@ class ApiClient {
         if (error.response?.status === 401 && !originalRequest._retry) {
           originalRequest._retry = true;
 
-          const refreshToken = localStorage.getItem('refreshToken');
+          const refreshToken = tokenStorage.getRefreshToken();
           if (refreshToken) {
             try {
               const response = await axios.post<ApiResponse>(`${API_BASE_URL}/auth/refresh`, {
@@ -95,15 +96,14 @@ class ApiClient {
 
               const { accessToken, refreshToken: newRefreshToken } = response.data.data;
 
-              localStorage.setItem('accessToken', accessToken);
-              localStorage.setItem('refreshToken', newRefreshToken);
+              tokenStorage.setAccessToken(accessToken);
+              tokenStorage.setRefreshToken(newRefreshToken);
 
               originalRequest.headers.Authorization = `Bearer ${accessToken}`;
               return this.client(originalRequest);
             } catch (refreshError) {
               // Refresh failed, clear tokens and redirect to login
-              localStorage.removeItem('accessToken');
-              localStorage.removeItem('refreshToken');
+              tokenStorage.clearTokens();
 
               // Prevent multiple redirects
               if (window.location.pathname !== '/login') {
@@ -113,8 +113,7 @@ class ApiClient {
             }
           } else {
             // No refresh token, clear everything and redirect
-            localStorage.removeItem('accessToken');
-            localStorage.removeItem('refreshToken');
+            tokenStorage.clearTokens();
 
             // Prevent multiple redirects
             if (window.location.pathname !== '/login') {
