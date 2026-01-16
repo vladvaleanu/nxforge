@@ -2,7 +2,7 @@
  * Jobs Page - List and manage automation jobs
  */
 
-import { useState } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
@@ -129,9 +129,14 @@ export default function JobsPage() {
   const jobs: Job[] = jobsData?.data || [];
   const modules: Module[] = modulesData?.data || [];
 
-  const getModuleName = (moduleId: string) => {
-    return modules.find(m => m.id === moduleId)?.name || moduleId;
-  };
+  // Create a Map for O(1) module lookup instead of O(n) find on every row
+  const moduleMap = useMemo(() => {
+    return new Map(modules.map(m => [m.id, m.name]));
+  }, [modules]);
+
+  const getModuleName = useCallback((moduleId: string) => {
+    return moduleMap.get(moduleId) || moduleId;
+  }, [moduleMap]);
 
   const handleExecute = (jobId: string, jobName: string) => {
     confirm(

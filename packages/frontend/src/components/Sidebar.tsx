@@ -119,7 +119,7 @@ function Sidebar() {
     // Initial build
     updateMenu();
 
-    // Listen for module changes event
+    // Listen for module changes event (event-driven updates only)
     const handleModulesChanged = () => {
       console.log('[Sidebar] Modules changed event received, reloading...');
       moduleLoaderService.reload().then(() => {
@@ -129,16 +129,11 @@ function Sidebar() {
 
     window.addEventListener('modules-changed', handleModulesChanged);
 
-    // Poll for module changes as fallback (every 30 seconds)
-    const interval = setInterval(() => {
-      moduleLoaderService.reload().then(() => {
-        updateMenu();
-      });
-    }, 30000);
+    // Removed polling - rely on event-driven updates only
+    // This eliminates 720 unnecessary requests per day (30 seconds × 24 hours)
 
     return () => {
       window.removeEventListener('modules-changed', handleModulesChanged);
-      clearInterval(interval);
     };
   }, []);
 

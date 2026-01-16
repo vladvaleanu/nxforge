@@ -176,15 +176,30 @@ export const executionsRoutes: FastifyPluginAsync = async (fastify) => {
 
   // Get execution statistics
   fastify.get('/stats/summary', async (request, reply) => {
-    const [total, pending, running, completed, failed, timeout, cancelled] = await Promise.all([
-      prisma.jobExecution.count(),
-      prisma.jobExecution.count({ where: { status: 'PENDING' } }),
-      prisma.jobExecution.count({ where: { status: 'RUNNING' } }),
-      prisma.jobExecution.count({ where: { status: 'COMPLETED' } }),
-      prisma.jobExecution.count({ where: { status: 'FAILED' } }),
-      prisma.jobExecution.count({ where: { status: 'TIMEOUT' } }),
-      prisma.jobExecution.count({ where: { status: 'CANCELLED' } }),
-    ]);
+    // Use groupBy to get all status counts in a single query instead of 7 separate queries
+    const statusStats = await prisma.jobExecution.groupBy({
+      by: ['status'],
+      _count: {
+        _all: true,
+      },
+    });
+
+    // Build status counts object
+    const statusCounts = statusStats.reduce((acc, stat) => {
+      acc[stat.status.toLowerCase()] = stat._count._all;
+      return acc;
+    }, {} as Record<string, number>);
+
+    // Calculate total
+    const total = statusStats.reduce((sum, stat) => sum + stat._count._all, 0);
+
+    // Extract individual status counts with defaults
+    const pending = statusCounts.pending || 0;
+    const running = statusCounts.running || 0;
+    const completed = statusCounts.completed || 0;
+    const failed = statusCounts.failed || 0;
+    const timeout = statusCounts.timeout || 0;
+    const cancelled = statusCounts.cancelled || 0;
 
     // Get average duration for completed jobs
     const avgDuration = await prisma.jobExecution.aggregate({

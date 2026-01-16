@@ -2,33 +2,42 @@
  * Main App component with routing
  */
 
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import Layout from './components/Layout';
 import OfflineBanner from './components/OfflineBanner';
-import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
-import DashboardPage from './pages/DashboardPage';
-import ModulesPage from './pages/ModulesPage';
-import JobsPage from './pages/JobsPage';
-import CreateJobPage from './pages/CreateJobPage';
-import ExecutionsPage from './pages/ExecutionsPage';
-import ExecutionDetailPage from './pages/ExecutionDetailPage';
-import EventsPage from './pages/EventsPage';
-import LiveDashboardPage from './pages/LiveDashboardPage';
-import EndpointsPage from './pages/EndpointsPage';
-import ReportsPage from './pages/ReportsPage';
-import HistoryPage from './pages/HistoryPage';
+import LoadingSpinner from './components/LoadingSpinner';
 import ProtectedRoute from './components/ProtectedRoute';
 import './index.css';
+
+// Code-split routes for better initial load performance
+// Auth pages are eagerly loaded (needed immediately)
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+
+// Lazy load all other pages
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const ModulesPage = lazy(() => import('./pages/ModulesPage'));
+const JobsPage = lazy(() => import('./pages/JobsPage'));
+const CreateJobPage = lazy(() => import('./pages/CreateJobPage'));
+const ExecutionsPage = lazy(() => import('./pages/ExecutionsPage'));
+const ExecutionDetailPage = lazy(() => import('./pages/ExecutionDetailPage'));
+const EventsPage = lazy(() => import('./pages/EventsPage'));
+const LiveDashboardPage = lazy(() => import('./pages/LiveDashboardPage'));
+const EndpointsPage = lazy(() => import('./pages/EndpointsPage'));
+const ReportsPage = lazy(() => import('./pages/ReportsPage'));
+const HistoryPage = lazy(() => import('./pages/HistoryPage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 1,
       refetchOnWindowFocus: false,
+      staleTime: 5 * 60 * 1000, // 5 minutes - data is fresh for this duration
+      gcTime: 10 * 60 * 1000,   // 10 minutes - cache garbage collection time
     },
   },
 });
@@ -40,22 +49,23 @@ function App() {
         <AuthProvider>
           <OfflineBanner />
           <BrowserRouter>
-            <Routes>
-              {/* Public routes */}
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<RegisterPage />} />
+            <Suspense fallback={<LoadingSpinner text="Loading..." />}>
+              <Routes>
+                {/* Public routes */}
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/register" element={<RegisterPage />} />
 
-              {/* Protected routes with Layout */}
-              <Route
-                path="/dashboard"
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <DashboardPage />
-                    </Layout>
-                  </ProtectedRoute>
-                }
-              />
+                {/* Protected routes with Layout */}
+                <Route
+                  path="/dashboard"
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <DashboardPage />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
               <Route
                 path="/modules"
                 element={
@@ -172,7 +182,8 @@ function App() {
               {/* Default redirect */}
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
-            </Routes>
+              </Routes>
+            </Suspense>
           </BrowserRouter>
         </AuthProvider>
       </ThemeProvider>
