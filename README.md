@@ -88,8 +88,8 @@ nxforge/
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/vladvaleanu/nxforge.git
-cd nxforge
+git clone https://github.com/vladvaleanu/automation-platform.git
+cd automation-platform
 
 # 2. Start database services (Docker)
 docker-compose up -d
@@ -751,7 +751,7 @@ Built with these amazing open-source projects:
 
 <div align="center">
 
-**[Documentation](./docs)** • **[Issues](https://github.com/vladvaleanu/nxforge/issues)** • **[Discussions](https://github.com/vladvaleanu/nxforge/discussions)**
+**[Documentation](./docs)** • **[Issues](https://github.com/vladvaleanu/automation-platform/issues)** • **[Discussions](https://github.com/vladvaleanu/automation-platform/discussions)**
 
 Made with ❤️ for Data Center Operators
 
