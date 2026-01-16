@@ -2,28 +2,30 @@
  * Integration tests for job execution flow
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from '@jest/globals';
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import request from 'supertest';
-import { App } from '../../app';
+import { FastifyInstance } from 'fastify';
+import { buildApp } from '../../app';
 import { DatabaseService } from '../../services/database.service';
 import { jobService } from '../../services/job.service';
 import path from 'path';
 
-describe('Job Execution Integration Tests', () => {
-  let app: App;
-  let server: any;
+// Skip integration tests if no database is available
+const skipIntegrationTests = process.env.SKIP_INTEGRATION_TESTS === 'true' || !process.env.DATABASE_URL;
+
+describe.skipIf(skipIntegrationTests)('Job Execution Integration Tests', () => {
+  let app: FastifyInstance;
   let authToken: string;
   let testModuleId: string;
   let testJobId: string;
 
   beforeAll(async () => {
     // Initialize app
-    app = new App();
-    await app.initialize();
-    server = app.getServer();
+    app = await buildApp();
+    await app.ready();
 
     // Register test user and get auth token
-    const registerResponse = await request(server)
+    const registerResponse = await request(app.server)
       .post('/api/v1/auth/register')
       .send({
         email: 'test-job@example.com',
@@ -31,7 +33,7 @@ describe('Job Execution Integration Tests', () => {
         name: 'Test User',
       });
 
-    const loginResponse = await request(server)
+    const loginResponse = await request(app.server)
       .post('/api/v1/auth/login')
       .send({
         email: 'test-job@example.com',
@@ -41,7 +43,7 @@ describe('Job Execution Integration Tests', () => {
     authToken = loginResponse.body.data.accessToken;
 
     // Register a test module
-    const moduleResponse = await request(server)
+    const moduleResponse = await request(app.server)
       .post('/api/v1/modules')
       .set('Authorization', `Bearer ${authToken}`)
       .send({
@@ -60,7 +62,7 @@ describe('Job Execution Integration Tests', () => {
     testModuleId = moduleResponse.body.data.id;
 
     // Enable the module
-    await request(server)
+    await request(app.server)
       .post(`/api/v1/modules/test-job-module/enable`)
       .set('Authorization', `Bearer ${authToken}`);
   });
@@ -68,23 +70,23 @@ describe('Job Execution Integration Tests', () => {
   afterAll(async () => {
     // Cleanup
     if (testJobId) {
-      await request(server)
+      await request(app.server)
         .delete(`/api/v1/jobs/${testJobId}`)
         .set('Authorization', `Bearer ${authToken}`);
     }
 
     if (testModuleId) {
-      await request(server)
+      await request(app.server)
         .delete(`/api/v1/modules/test-job-module`)
         .set('Authorization', `Bearer ${authToken}`);
     }
 
-    await app.shutdown();
+    await app.close();
   });
 
   describe('Job Creation and Management', () => {
     it('should create a new job', async () => {
-      const response = await request(server)
+      const response = await request(app.server)
         .post('/api/v1/jobs')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -109,7 +111,7 @@ describe('Job Execution Integration Tests', () => {
     });
 
     it('should list all jobs', async () => {
-      const response = await request(server)
+      const response = await request(app.server)
         .get('/api/v1/jobs')
         .set('Authorization', `Bearer ${authToken}`);
 
@@ -120,7 +122,7 @@ describe('Job Execution Integration Tests', () => {
     });
 
     it('should get job details', async () => {
-      const response = await request(server)
+      const response = await request(app.server)
         .get(`/api/v1/jobs/${testJobId}`)
         .set('Authorization', `Bearer ${authToken}`);
 
@@ -131,7 +133,7 @@ describe('Job Execution Integration Tests', () => {
     });
 
     it('should disable a job', async () => {
-      const response = await request(server)
+      const response = await request(app.server)
         .put(`/api/v1/jobs/${testJobId}/disable`)
         .set('Authorization', `Bearer ${authToken}`);
 
@@ -141,7 +143,7 @@ describe('Job Execution Integration Tests', () => {
     });
 
     it('should enable a job', async () => {
-      const response = await request(server)
+      const response = await request(app.server)
         .put(`/api/v1/jobs/${testJobId}/enable`)
         .set('Authorization', `Bearer ${authToken}`);
 
@@ -153,7 +155,7 @@ describe('Job Execution Integration Tests', () => {
 
   describe('Job Execution', () => {
     it('should manually execute a job', async () => {
-      const response = await request(server)
+      const response = await request(app.server)
         .post(`/api/v1/jobs/${testJobId}/execute`)
         .set('Authorization', `Bearer ${authToken}`);
 
@@ -166,7 +168,7 @@ describe('Job Execution Integration Tests', () => {
       // Wait a bit for execution to start
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      const response = await request(server)
+      const response = await request(app.server)
         .get('/api/v1/executions')
         .set('Authorization', `Bearer ${authToken}`)
         .query({ jobId: testJobId });
@@ -179,14 +181,14 @@ describe('Job Execution Integration Tests', () => {
 
     it('should get execution details', async () => {
       // Get the latest execution
-      const listResponse = await request(server)
+      const listResponse = await request(app.server)
         .get('/api/v1/executions')
         .set('Authorization', `Bearer ${authToken}`)
         .query({ jobId: testJobId, limit: 1 });
 
       const executionId = listResponse.body.data[0].id;
 
-      const response = await request(server)
+      const response = await request(app.server)
         .get(`/api/v1/executions/${executionId}`)
         .set('Authorization', `Bearer ${authToken}`);
 
@@ -199,7 +201,7 @@ describe('Job Execution Integration Tests', () => {
     });
 
     it('should filter executions by status', async () => {
-      const response = await request(server)
+      const response = await request(app.server)
         .get('/api/v1/executions')
         .set('Authorization', `Bearer ${authToken}`)
         .query({ status: 'COMPLETED' });
@@ -212,7 +214,7 @@ describe('Job Execution Integration Tests', () => {
 
   describe('Job Validation', () => {
     it('should reject job with invalid cron expression', async () => {
-      const response = await request(server)
+      const response = await request(app.server)
         .post('/api/v1/jobs')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -228,7 +230,7 @@ describe('Job Execution Integration Tests', () => {
     });
 
     it('should reject job with non-existent module', async () => {
-      const response = await request(server)
+      const response = await request(app.server)
         .post('/api/v1/jobs')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -243,7 +245,7 @@ describe('Job Execution Integration Tests', () => {
     });
 
     it('should reject job with missing required fields', async () => {
-      const response = await request(server)
+      const response = await request(app.server)
         .post('/api/v1/jobs')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -258,7 +260,7 @@ describe('Job Execution Integration Tests', () => {
 
   describe('Job Updates', () => {
     it('should update job configuration', async () => {
-      const response = await request(server)
+      const response = await request(app.server)
         .put(`/api/v1/jobs/${testJobId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -275,7 +277,7 @@ describe('Job Execution Integration Tests', () => {
     });
 
     it('should update job schedule', async () => {
-      const response = await request(server)
+      const response = await request(app.server)
         .put(`/api/v1/jobs/${testJobId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({

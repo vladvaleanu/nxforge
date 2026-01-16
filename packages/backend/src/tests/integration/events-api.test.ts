@@ -2,24 +2,26 @@
  * Integration tests for Events API endpoints
  */
 
-import { describe, it, expect, beforeAll, afterAll } from '@jest/globals';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
-import { App } from '../../app';
+import { FastifyInstance } from 'fastify';
+import { buildApp } from '../../app';
 
-describe('Events API Integration Tests', () => {
-  let app: App;
-  let server: any;
+// Skip integration tests if no database is available
+const skipIntegrationTests = process.env.SKIP_INTEGRATION_TESTS === 'true' || !process.env.DATABASE_URL;
+
+describe.skipIf(skipIntegrationTests)('Events API Integration Tests', () => {
+  let app: FastifyInstance;
   let authToken: string;
   let testEventId: string;
 
   beforeAll(async () => {
     // Initialize app
-    app = new App();
-    await app.initialize();
-    server = app.getServer();
+    app = await buildApp();
+    await app.ready();
 
     // Register test user and get auth token
-    await request(server)
+    await request(app.server)
       .post('/api/v1/auth/register')
       .send({
         email: 'test-events@example.com',
@@ -27,7 +29,7 @@ describe('Events API Integration Tests', () => {
         name: 'Test User',
       });
 
-    const loginResponse = await request(server)
+    const loginResponse = await request(app.server)
       .post('/api/v1/auth/login')
       .send({
         email: 'test-events@example.com',
@@ -38,12 +40,12 @@ describe('Events API Integration Tests', () => {
   });
 
   afterAll(async () => {
-    await app.shutdown();
+    await app.close();
   });
 
   describe('Event Emission', () => {
     it('should emit a new event', async () => {
-      const response = await request(server)
+      const response = await request(app.server)
         .post('/api/v1/events')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -61,7 +63,7 @@ describe('Events API Integration Tests', () => {
     });
 
     it('should emit event with source', async () => {
-      const response = await request(server)
+      const response = await request(app.server)
         .post('/api/v1/events')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -75,7 +77,7 @@ describe('Events API Integration Tests', () => {
     });
 
     it('should reject event without name', async () => {
-      const response = await request(server)
+      const response = await request(app.server)
         .post('/api/v1/events')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
@@ -89,7 +91,7 @@ describe('Events API Integration Tests', () => {
 
   describe('Event Listing', () => {
     it('should list all events', async () => {
-      const response = await request(server)
+      const response = await request(app.server)
         .get('/api/v1/events')
         .set('Authorization', `Bearer ${authToken}`);
 
@@ -101,7 +103,7 @@ describe('Events API Integration Tests', () => {
     });
 
     it('should filter events by name', async () => {
-      const response = await request(server)
+      const response = await request(app.server)
         .get('/api/v1/events')
         .set('Authorization', `Bearer ${authToken}`)
         .query({ name: 'test.event' });
@@ -112,7 +114,7 @@ describe('Events API Integration Tests', () => {
     });
 
     it('should filter events by source', async () => {
-      const response = await request(server)
+      const response = await request(app.server)
         .get('/api/v1/events')
         .set('Authorization', `Bearer ${authToken}`)
         .query({ source: 'custom-service' });
@@ -123,7 +125,7 @@ describe('Events API Integration Tests', () => {
     });
 
     it('should paginate events', async () => {
-      const response = await request(server)
+      const response = await request(app.server)
         .get('/api/v1/events')
         .set('Authorization', `Bearer ${authToken}`)
         .query({ page: 1, limit: 5 });
@@ -138,7 +140,7 @@ describe('Events API Integration Tests', () => {
 
   describe('Event Details', () => {
     it('should get event by ID', async () => {
-      const response = await request(server)
+      const response = await request(app.server)
         .get(`/api/v1/events/${testEventId}`)
         .set('Authorization', `Bearer ${authToken}`);
 
@@ -149,7 +151,7 @@ describe('Events API Integration Tests', () => {
     });
 
     it('should return 404 for non-existent event', async () => {
-      const response = await request(server)
+      const response = await request(app.server)
         .get('/api/v1/events/non-existent-id')
         .set('Authorization', `Bearer ${authToken}`);
 
@@ -160,7 +162,7 @@ describe('Events API Integration Tests', () => {
 
   describe('Recent Events', () => {
     it('should get recent events', async () => {
-      const response = await request(server)
+      const response = await request(app.server)
         .get('/api/v1/events/recent')
         .set('Authorization', `Bearer ${authToken}`)
         .query({ limit: 10 });
@@ -182,19 +184,19 @@ describe('Events API Integration Tests', () => {
   describe('Event Statistics', () => {
     beforeAll(async () => {
       // Emit some test events for statistics
-      await request(server)
+      await request(app.server)
         .post('/api/v1/events')
         .set('Authorization', `Bearer ${authToken}`)
         .send({ name: 'stats.test.1', payload: {} });
 
-      await request(server)
+      await request(app.server)
         .post('/api/v1/events')
         .set('Authorization', `Bearer ${authToken}`)
         .send({ name: 'stats.test.2', payload: {} });
     });
 
     it('should get event statistics summary', async () => {
-      const response = await request(server)
+      const response = await request(app.server)
         .get('/api/v1/events/stats/summary')
         .set('Authorization', `Bearer ${authToken}`);
 
@@ -210,7 +212,7 @@ describe('Events API Integration Tests', () => {
     });
 
     it('should have positive event counts', async () => {
-      const response = await request(server)
+      const response = await request(app.server)
         .get('/api/v1/events/stats/summary')
         .set('Authorization', `Bearer ${authToken}`);
 
@@ -221,7 +223,7 @@ describe('Events API Integration Tests', () => {
 
   describe('Event Cleanup', () => {
     it('should cleanup old events', async () => {
-      const response = await request(server)
+      const response = await request(app.server)
         .delete('/api/v1/events/cleanup')
         .set('Authorization', `Bearer ${authToken}`)
         .query({ olderThan: 30 });
@@ -233,7 +235,7 @@ describe('Events API Integration Tests', () => {
     });
 
     it('should require olderThan parameter', async () => {
-      const response = await request(server)
+      const response = await request(app.server)
         .delete('/api/v1/events/cleanup')
         .set('Authorization', `Bearer ${authToken}`);
 
@@ -244,14 +246,14 @@ describe('Events API Integration Tests', () => {
 
   describe('Authorization', () => {
     it('should reject requests without auth token', async () => {
-      const response = await request(server)
+      const response = await request(app.server)
         .get('/api/v1/events');
 
       expect(response.status).toBe(401);
     });
 
     it('should reject requests with invalid token', async () => {
-      const response = await request(server)
+      const response = await request(app.server)
         .get('/api/v1/events')
         .set('Authorization', 'Bearer invalid-token');
 

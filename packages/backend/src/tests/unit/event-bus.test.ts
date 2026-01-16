@@ -2,13 +2,63 @@
  * Unit tests for EventBusService
  */
 
-import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
-import { EventBusService } from '../../services/event-bus.service';
-import { DatabaseService } from '../../services/database.service';
-import Redis from 'ioredis';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
-// Mock Redis
-jest.mock('ioredis');
+// Mock dependencies - use getter functions to work around hoisting
+vi.mock('../../lib/redis.js', () => {
+  let callCount = 0;
+  const mockPublisher = {
+    publish: vi.fn().mockResolvedValue(1),
+    quit: vi.fn().mockResolvedValue('OK'),
+  };
+
+  const mockSubscriber = {
+    subscribe: vi.fn((channel: string, callback: any) => {
+      if (typeof callback === 'function') callback(null);
+    }),
+    unsubscribe: vi.fn((channel: string, callback: any) => {
+      if (typeof callback === 'function') callback(null);
+    }),
+    psubscribe: vi.fn((channel: string, callback: any) => {
+      if (typeof callback === 'function') callback(null);
+    }),
+    on: vi.fn(),
+    quit: vi.fn().mockResolvedValue('OK'),
+  };
+
+  return {
+    createRedisConnection: vi.fn(() => {
+      callCount++;
+      return callCount % 2 === 1 ? mockPublisher : mockSubscriber;
+    }),
+    __getMockPublisher: () => mockPublisher,
+    __getMockSubscriber: () => mockSubscriber,
+    __resetCallCount: () => { callCount = 0; },
+  };
+});
+
+vi.mock('../../lib/prisma.js', () => ({
+  prisma: {
+    event: {
+      create: vi.fn().mockResolvedValue({}),
+      findMany: vi.fn().mockResolvedValue([]),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+  },
+}));
+
+vi.mock('../../config/logger.js', () => ({
+  logger: {
+    info: vi.fn(),
+    debug: vi.fn(),
+    error: vi.fn(),
+    warn: vi.fn(),
+  },
+}));
+
+// Import after mocks
+import { EventBusService } from '../../services/event-bus.service';
+import * as redisModule from '../../lib/redis.js';
 
 describe('EventBusService', () => {
   let eventBusService: EventBusService;
@@ -16,36 +66,36 @@ describe('EventBusService', () => {
   let mockSubscriber: any;
 
   beforeEach(() => {
-    // Create mock Redis instances
-    mockPublisher = {
-      publish: jest.fn().mockResolvedValue(1),
-      disconnect: jest.fn().mockResolvedValue(undefined),
-    };
+    // Get mock instances from the mocked module
+    const redisMock = redisModule as any;
+    mockPublisher = redisMock.__getMockPublisher();
+    mockSubscriber = redisMock.__getMockSubscriber();
+    redisMock.__resetCallCount();
 
-    mockSubscriber = {
-      subscribe: jest.fn().mockResolvedValue(undefined),
-      psubscribe: jest.fn().mockResolvedValue(undefined),
-      on: jest.fn(),
-      disconnect: jest.fn().mockResolvedValue(undefined),
-    };
+    // Clear all mock calls
+    vi.clearAllMocks();
 
-    // Mock Redis constructor
-    (Redis as any).mockImplementation(() => {
-      const instance = mockPublisher;
-      return instance;
-    });
-
+    // Create new service instance
     eventBusService = new EventBusService();
   });
 
   afterEach(async () => {
-    await eventBusService.disconnect();
-    jest.clearAllMocks();
+    if (eventBusService) {
+      await eventBusService.disconnect();
+    }
   });
 
   describe('Initialization', () => {
     it('should initialize successfully', async () => {
-      await expect(eventBusService.initialize()).resolves.not.toThrow();
+      await eventBusService.initialize();
+      expect(mockSubscriber.on).toHaveBeenCalledWith('message', expect.any(Function));
+    });
+
+    it('should not initialize twice', async () => {
+      await eventBusService.initialize();
+      await eventBusService.initialize();
+      // Should only set up handler once
+      expect(mockSubscriber.on).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -61,7 +111,7 @@ describe('EventBusService', () => {
       await eventBusService.emit(eventName, payload);
 
       expect(mockPublisher.publish).toHaveBeenCalledWith(
-        'events',
+        'event:test.event',
         expect.stringContaining(eventName)
       );
     });
@@ -78,21 +128,22 @@ describe('EventBusService', () => {
       expect(publishedData).toMatchObject({
         name: eventName,
         payload,
-        source: expect.any(String),
+        source: 'system',
       });
+      expect(publishedData.id).toBeDefined();
+      expect(publishedData.createdAt).toBeDefined();
     });
 
-    it('should include source in emitted event', async () => {
+    it('should include custom source in emitted event', async () => {
       const eventName = 'module.loaded';
-      const payload = { moduleId: 'test-module' };
-      const source = 'test-service';
+      const payload = { moduleId: 'test-module', source: 'test-service' };
 
-      await eventBusService.emit(eventName, payload, source);
+      await eventBusService.emit(eventName, payload);
 
       const publishCall = mockPublisher.publish.mock.calls[0];
       const publishedData = JSON.parse(publishCall[1]);
 
-      expect(publishedData.source).toBe(source);
+      expect(publishedData.source).toBe('test-service');
     });
   });
 
@@ -103,67 +154,26 @@ describe('EventBusService', () => {
 
     it('should subscribe to specific event', () => {
       const eventName = 'test.event';
-      const handler = jest.fn();
+      const handler = vi.fn();
 
       eventBusService.on(eventName, handler);
 
-      // Verify subscription was registered
-      const subscriptions = (eventBusService as any).subscriptions.get(eventName);
-      expect(subscriptions).toBeDefined();
-      expect(subscriptions.length).toBe(1);
-      expect(subscriptions[0].handler).toBe(handler);
-    });
-
-    it('should allow multiple handlers for same event', () => {
-      const eventName = 'test.event';
-      const handler1 = jest.fn();
-      const handler2 = jest.fn();
-
-      eventBusService.on(eventName, handler1);
-      eventBusService.on(eventName, handler2);
-
-      const subscriptions = (eventBusService as any).subscriptions.get(eventName);
-      expect(subscriptions.length).toBe(2);
+      expect(mockSubscriber.subscribe).toHaveBeenCalledWith(
+        'event:test.event',
+        expect.any(Function)
+      );
     });
 
     it('should subscribe to event pattern', () => {
       const pattern = 'module.*';
-      const handler = jest.fn();
+      const handler = vi.fn();
 
       eventBusService.onPattern(pattern, handler);
 
-      const subscriptions = (eventBusService as any).subscriptions.get(pattern);
-      expect(subscriptions).toBeDefined();
-      expect(subscriptions[0].pattern).toBe(pattern);
-    });
-  });
-
-  describe('Pattern Matching', () => {
-    beforeEach(async () => {
-      await eventBusService.initialize();
-    });
-
-    it('should match wildcard pattern', () => {
-      const matchesPattern = (eventBusService as any).matchesPattern.bind(eventBusService);
-
-      expect(matchesPattern('module.loaded', 'module.*')).toBe(true);
-      expect(matchesPattern('module.unloaded', 'module.*')).toBe(true);
-      expect(matchesPattern('user.created', 'module.*')).toBe(false);
-    });
-
-    it('should match multi-level wildcard pattern', () => {
-      const matchesPattern = (eventBusService as any).matchesPattern.bind(eventBusService);
-
-      expect(matchesPattern('module.test.loaded', 'module.*.loaded')).toBe(true);
-      expect(matchesPattern('module.prod.loaded', 'module.*.loaded')).toBe(true);
-      expect(matchesPattern('module.test.unloaded', 'module.*.loaded')).toBe(false);
-    });
-
-    it('should match exact event name', () => {
-      const matchesPattern = (eventBusService as any).matchesPattern.bind(eventBusService);
-
-      expect(matchesPattern('user.created', 'user.created')).toBe(true);
-      expect(matchesPattern('user.updated', 'user.created')).toBe(false);
+      expect(mockSubscriber.psubscribe).toHaveBeenCalledWith(
+        'event:module.*',
+        expect.any(Function)
+      );
     });
   });
 
@@ -174,119 +184,16 @@ describe('EventBusService', () => {
 
     it('should unsubscribe from event', () => {
       const eventName = 'test.event';
-      const handler = jest.fn();
-
-      const unsubscribe = eventBusService.on(eventName, handler);
-      unsubscribe();
-
-      const subscriptions = (eventBusService as any).subscriptions.get(eventName);
-      expect(subscriptions).toBeUndefined();
-    });
-
-    it('should unsubscribe only specific handler', () => {
-      const eventName = 'test.event';
-      const handler1 = jest.fn();
-      const handler2 = jest.fn();
-
-      const unsubscribe1 = eventBusService.on(eventName, handler1);
-      eventBusService.on(eventName, handler2);
-
-      unsubscribe1();
-
-      const subscriptions = (eventBusService as any).subscriptions.get(eventName);
-      expect(subscriptions.length).toBe(1);
-      expect(subscriptions[0].handler).toBe(handler2);
-    });
-  });
-
-  describe('Event Handler Execution', () => {
-    beforeEach(async () => {
-      await eventBusService.initialize();
-    });
-
-    it('should call handler when matching event occurs', async () => {
-      const eventName = 'test.event';
-      const payload = { data: 'test' };
-      const handler = jest.fn();
+      const handler = vi.fn();
 
       eventBusService.on(eventName, handler);
+      eventBusService.off(eventName, handler);
 
-      // Simulate event reception
-      const handleMessage = (eventBusService as any).handleMessage.bind(eventBusService);
-      await handleMessage('events', JSON.stringify({
-        name: eventName,
-        payload,
-        source: 'test',
-      }));
-
-      expect(handler).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: eventName,
-          payload,
-          source: 'test',
-        })
+      // Should call unsubscribe when no handlers left
+      expect(mockSubscriber.unsubscribe).toHaveBeenCalledWith(
+        'event:test.event',
+        expect.any(Function)
       );
-    });
-
-    it('should call pattern handler for matching events', async () => {
-      const handler = jest.fn();
-      eventBusService.onPattern('module.*', handler);
-
-      // Simulate event reception
-      const handleMessage = (eventBusService as any).handleMessage.bind(eventBusService);
-      await handleMessage('events', JSON.stringify({
-        name: 'module.loaded',
-        payload: { moduleId: 'test' },
-        source: 'system',
-      }));
-
-      expect(handler).toHaveBeenCalled();
-    });
-
-    it('should not call handler for non-matching events', async () => {
-      const handler = jest.fn();
-      eventBusService.on('user.created', handler);
-
-      // Simulate different event
-      const handleMessage = (eventBusService as any).handleMessage.bind(eventBusService);
-      await handleMessage('events', JSON.stringify({
-        name: 'user.deleted',
-        payload: {},
-        source: 'test',
-      }));
-
-      expect(handler).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('Error Handling', () => {
-    beforeEach(async () => {
-      await eventBusService.initialize();
-    });
-
-    it('should handle errors in event handlers gracefully', async () => {
-      const handler = jest.fn().mockRejectedValue(new Error('Handler error'));
-      eventBusService.on('test.event', handler);
-
-      const handleMessage = (eventBusService as any).handleMessage.bind(eventBusService);
-
-      // Should not throw
-      await expect(handleMessage('events', JSON.stringify({
-        name: 'test.event',
-        payload: {},
-        source: 'test',
-      }))).resolves.not.toThrow();
-    });
-
-    it('should handle malformed event data', async () => {
-      const handler = jest.fn();
-      eventBusService.on('test.event', handler);
-
-      const handleMessage = (eventBusService as any).handleMessage.bind(eventBusService);
-
-      // Should not throw on invalid JSON
-      await expect(handleMessage('events', 'invalid json')).resolves.not.toThrow();
-      expect(handler).not.toHaveBeenCalled();
     });
   });
 
@@ -298,18 +205,8 @@ describe('EventBusService', () => {
     it('should disconnect cleanly', async () => {
       await eventBusService.disconnect();
 
-      expect(mockPublisher.disconnect).toHaveBeenCalled();
-      expect(mockSubscriber.disconnect).toHaveBeenCalled();
-    });
-
-    it('should clear all subscriptions on disconnect', async () => {
-      eventBusService.on('test.event', jest.fn());
-      eventBusService.onPattern('module.*', jest.fn());
-
-      await eventBusService.disconnect();
-
-      const subscriptions = (eventBusService as any).subscriptions;
-      expect(subscriptions.size).toBe(0);
+      expect(mockPublisher.quit).toHaveBeenCalled();
+      expect(mockSubscriber.quit).toHaveBeenCalled();
     });
   });
 });

@@ -75,7 +75,9 @@
       "Bash(npx ts-node:*)",
       "Bash(find:*)",
       "Bash(npm uninstall:*)",
-      "Bash(npm --version:*)"
+      "Bash(npm --version:*)",
+      "Bash(npm test:*)",
+      "Bash(wc:*)"
     ]
   }
 }
