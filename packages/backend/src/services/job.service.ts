@@ -4,7 +4,8 @@
  * Uses BullMQ for all job operations (replaces JobQueueService, JobSchedulerService, WorkerService)
  */
 
-import { Queue, Worker, QueueEvents, Job as BullJob, QueueEventsListener } from 'bullmq';
+import { Queue, Worker, QueueEvents, Job as BullJob } from 'bullmq';
+import { parseExpression } from 'cron-parser';
 import { createRedisConnection } from '../lib/redis.js';
 import { prisma } from '../lib/prisma.js';
 import { logger } from '../config/logger.js';
@@ -100,14 +101,31 @@ export class JobService {
       );
 
       // Update execution record
+      const completedAt = new Date();
       await prisma.jobExecution.update({
         where: { id: execution.id },
         data: {
           status: 'COMPLETED',
-          completedAt: new Date(),
+          completedAt,
           result: result as any,
         },
       });
+
+      // Update job schedule's lastRun and calculate nextRun
+      const schedule = await prisma.jobSchedule.findFirst({
+        where: { jobId, enabled: true },
+      });
+      if (schedule) {
+        const nextRun = this.calculateNextRun(schedule.schedule, schedule.timezone);
+        await prisma.jobSchedule.update({
+          where: { id: schedule.id },
+          data: {
+            lastRun: completedAt,
+            nextRun,
+          },
+        });
+        logger.debug(`Updated job schedule: lastRun=${completedAt.toISOString()}, nextRun=${nextRun.toISOString()}`);
+      }
 
       logger.info(`Job ${jobId} completed successfully`, { executionId: execution.id });
       return result;
@@ -163,6 +181,23 @@ export class JobService {
   }
 
   /**
+   * Calculate the next run time from a cron expression
+   */
+  private calculateNextRun(cronExpression: string, timezone: string = 'UTC'): Date {
+    try {
+      const interval = parseExpression(cronExpression, {
+        currentDate: new Date(),
+        tz: timezone,
+      });
+      return interval.next().toDate();
+    } catch (error) {
+      logger.warn(`Invalid cron expression: ${cronExpression}`, { error });
+      // Return a far future date if parsing fails
+      return new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+    }
+  }
+
+  /**
    * Schedule a recurring job using cron expression
    */
   async scheduleJob(job: Job, cronExpression: string): Promise<void> {
@@ -190,6 +225,9 @@ export class JobService {
       }
     );
 
+    // Calculate the next run time using cron-parser
+    const nextRun = this.calculateNextRun(cronExpression);
+
     // Update job schedule in database
     // First, try to find existing schedule for this job
     const existingSchedule = await prisma.jobSchedule.findFirst({
@@ -203,6 +241,7 @@ export class JobService {
         data: {
           schedule: cronExpression,
           enabled: true,
+          nextRun,
         },
       });
     } else {
@@ -213,12 +252,12 @@ export class JobService {
           schedule: cronExpression,
           enabled: true,
           timezone: 'UTC',
-          nextRun: new Date(), // BullMQ handles actual scheduling
+          nextRun,
         },
       });
     }
 
-    logger.info(`Job scheduled: ${job.id}`);
+    logger.info(`Job scheduled: ${job.id}`, { nextRun: nextRun.toISOString() });
   }
 
   /**
