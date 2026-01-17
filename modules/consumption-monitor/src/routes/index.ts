@@ -152,6 +152,7 @@ export async function registerRoutes(fastify: FastifyInstance, context: ModuleCo
   );
 
   // GET /monthly-summary - Get monthly consumption summary for all endpoints (for reports)
+  // OPTIMIZED: Single query instead of N+1 queries (1 query for endpoints + N queries for readings)
   fastify.get('/monthly-summary', async () => {
     const now = new Date();
     const currentYear = now.getFullYear();
@@ -161,23 +162,17 @@ export async function registerRoutes(fastify: FastifyInstance, context: ModuleCo
     const firstDay = new Date(currentYear, currentMonth - 1, 1);
     const lastDay = new Date(currentYear, currentMonth, 0, 23, 59, 59);
 
-    // Get all enabled endpoints
-    const endpoints = await prisma.endpoint.findMany({
+    // OPTIMIZED: Single query to fetch all endpoints with their readings for the month
+    // This replaces the N+1 pattern (1 query for endpoints + N queries for each endpoint's readings)
+    const endpointsWithReadings = await prisma.endpoint.findMany({
       where: { enabled: true },
       select: {
         id: true,
         name: true,
         clientName: true,
         location: true,
-      },
-    });
-
-    const monthlyData = await Promise.all(
-      endpoints.map(async (endpoint: any) => {
-        // Get all readings for current month
-        const readings = await prisma.consumptionReading.findMany({
+        readings: {
           where: {
-            endpointId: endpoint.id,
             timestamp: {
               gte: firstDay,
               lte: lastDay,
@@ -190,41 +185,47 @@ export async function registerRoutes(fastify: FastifyInstance, context: ModuleCo
             timestamp: true,
             totalKwh: true,
           },
-        });
+        },
+      },
+    });
 
-        if (readings.length === 0) {
-          return {
-            endpointId: endpoint.id,
-            endpointName: endpoint.name,
-            clientName: endpoint.clientName,
-            location: endpoint.location,
-            currentKwh: null,
-            previousKwh: null,
-            consumedKwh: null,
-            lastReadingAt: null,
-            readingsCount: 0,
-          };
-        }
+    // Process the data in application code (O(n) - single pass through endpoints)
+    type EndpointWithReadings = (typeof endpointsWithReadings)[number];
+    const monthlyData = endpointsWithReadings.map((endpoint: EndpointWithReadings) => {
+      const readings = endpoint.readings;
 
-        const firstReading = readings[0];
-        const lastReading = readings[readings.length - 1];
-        const previousKwh = firstReading.totalKwh!;
-        const currentKwh = lastReading.totalKwh!;
-        const consumedKwh = currentKwh - previousKwh;
-
+      if (readings.length === 0) {
         return {
           endpointId: endpoint.id,
           endpointName: endpoint.name,
           clientName: endpoint.clientName,
           location: endpoint.location,
-          currentKwh,
-          previousKwh,
-          consumedKwh,
-          lastReadingAt: lastReading.timestamp,
-          readingsCount: readings.length,
+          currentKwh: null,
+          previousKwh: null,
+          consumedKwh: null,
+          lastReadingAt: null,
+          readingsCount: 0,
         };
-      })
-    );
+      }
+
+      const firstReading = readings[0];
+      const lastReading = readings[readings.length - 1];
+      const previousKwh = firstReading.totalKwh!;
+      const currentKwh = lastReading.totalKwh!;
+      const consumedKwh = currentKwh - previousKwh;
+
+      return {
+        endpointId: endpoint.id,
+        endpointName: endpoint.name,
+        clientName: endpoint.clientName,
+        location: endpoint.location,
+        currentKwh,
+        previousKwh,
+        consumedKwh,
+        lastReadingAt: lastReading.timestamp,
+        readingsCount: readings.length,
+      };
+    });
 
     return {
       success: true,
