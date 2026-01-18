@@ -31,6 +31,40 @@ export interface User {
   permissions: string[];
 }
 
+export interface UserProfile {
+  id: string;
+  email: string;
+  username: string;
+  firstName?: string;
+  lastName?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  lastLogin?: string;
+  roles: string[];
+  permissions: string[];
+  sessions: Session[];
+}
+
+export interface Session {
+  id: string;
+  userAgent?: string;
+  ipAddress?: string;
+  createdAt: string;
+  expiresAt: string;
+}
+
+export interface UpdateProfileData {
+  firstName?: string;
+  lastName?: string;
+  username?: string;
+}
+
+export interface ChangePasswordData {
+  currentPassword: string;
+  newPassword: string;
+}
+
 export const authApi = {
   async login(credentials: LoginCredentials): Promise<ApiResponse<AuthTokens>> {
     return apiClient.post<AuthTokens>('/auth/login', credentials);
@@ -50,5 +84,25 @@ export const authApi = {
 
   async refreshToken(refreshToken: string): Promise<ApiResponse<AuthTokens>> {
     return apiClient.post<AuthTokens>('/auth/refresh', { refreshToken });
+  },
+
+  async getProfile(): Promise<ApiResponse<UserProfile>> {
+    return apiClient.get<UserProfile>('/auth/profile');
+  },
+
+  async updateProfile(data: UpdateProfileData): Promise<ApiResponse<{ user: UserProfile }>> {
+    return apiClient.put<{ user: UserProfile }>('/auth/profile', data);
+  },
+
+  async changePassword(data: ChangePasswordData): Promise<ApiResponse<{ message: string }>> {
+    return apiClient.put<{ message: string }>('/auth/password', data);
+  },
+
+  async revokeSession(sessionId: string): Promise<ApiResponse<{ message: string }>> {
+    return apiClient.delete<{ message: string }>(`/auth/sessions/${sessionId}`);
+  },
+
+  async revokeOtherSessions(refreshToken: string): Promise<ApiResponse<{ message: string }>> {
+    return apiClient.delete<{ message: string }>('/auth/sessions', { refreshToken });
   },
 };

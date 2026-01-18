@@ -26,6 +26,17 @@ const refreshSchema = z.object({
   refreshToken: z.string(),
 });
 
+const updateProfileSchema = z.object({
+  firstName: z.string().min(1).max(100).optional(),
+  lastName: z.string().min(1).max(100).optional(),
+  username: z.string().min(3).max(50).optional(),
+});
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8),
+});
+
 export async function authRoutes(app: FastifyInstance) {
   const authService = new AuthService(app);
 
@@ -191,7 +202,7 @@ export async function authRoutes(app: FastifyInstance) {
 
   /**
    * GET /api/v1/auth/me
-   * Get current user profile
+   * Get current user profile (basic)
    */
   app.get('/me', { onRequest: [requireAuth] }, async (request, reply) => {
     reply.status(200).send({
@@ -204,5 +215,178 @@ export async function authRoutes(app: FastifyInstance) {
         timestamp: new Date().toISOString(),
       },
     });
+  });
+
+  /**
+   * GET /api/v1/auth/profile
+   * Get current user profile with full details including sessions
+   */
+  app.get('/profile', { onRequest: [requireAuth] }, async (request, reply) => {
+    try {
+      const user = request.user as { userId: string };
+      const profile = await authService.getProfile(user.userId);
+
+      reply.status(200).send({
+        success: true,
+        data: profile,
+        meta: {
+          requestId: request.id,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } catch (err) {
+      const error = err as Error;
+      reply.status(400).send({
+        success: false,
+        error: {
+          message: error.message,
+          statusCode: 400,
+        },
+        meta: {
+          requestId: request.id,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    }
+  });
+
+  /**
+   * PUT /api/v1/auth/profile
+   * Update current user profile
+   */
+  app.put('/profile', { onRequest: [requireAuth] }, async (request, reply) => {
+    try {
+      const user = request.user as { userId: string };
+      const data = updateProfileSchema.parse(request.body);
+
+      const result = await authService.updateProfile(user.userId, data);
+
+      reply.status(200).send({
+        success: true,
+        data: result,
+        meta: {
+          requestId: request.id,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } catch (err) {
+      const error = err as Error;
+      reply.status(400).send({
+        success: false,
+        error: {
+          message: error.message,
+          statusCode: 400,
+        },
+        meta: {
+          requestId: request.id,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    }
+  });
+
+  /**
+   * PUT /api/v1/auth/password
+   * Change current user password
+   */
+  app.put('/password', { onRequest: [requireAuth] }, async (request, reply) => {
+    try {
+      const user = request.user as { userId: string };
+      const { currentPassword, newPassword } = changePasswordSchema.parse(request.body);
+
+      await authService.changePassword(user.userId, currentPassword, newPassword);
+
+      reply.status(200).send({
+        success: true,
+        data: { message: 'Password changed successfully. All other sessions have been revoked.' },
+        meta: {
+          requestId: request.id,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } catch (err) {
+      const error = err as Error;
+      reply.status(400).send({
+        success: false,
+        error: {
+          message: error.message,
+          statusCode: 400,
+        },
+        meta: {
+          requestId: request.id,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    }
+  });
+
+  /**
+   * DELETE /api/v1/auth/sessions/:sessionId
+   * Revoke a specific session
+   */
+  app.delete('/sessions/:sessionId', { onRequest: [requireAuth] }, async (request, reply) => {
+    try {
+      const user = request.user as { userId: string };
+      const { sessionId } = request.params as { sessionId: string };
+
+      await authService.revokeSession(user.userId, sessionId);
+
+      reply.status(200).send({
+        success: true,
+        data: { message: 'Session revoked successfully' },
+        meta: {
+          requestId: request.id,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } catch (err) {
+      const error = err as Error;
+      reply.status(400).send({
+        success: false,
+        error: {
+          message: error.message,
+          statusCode: 400,
+        },
+        meta: {
+          requestId: request.id,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    }
+  });
+
+  /**
+   * DELETE /api/v1/auth/sessions
+   * Revoke all other sessions (logout everywhere else)
+   */
+  app.delete('/sessions', { onRequest: [requireAuth] }, async (request, reply) => {
+    try {
+      const user = request.user as { userId: string };
+      const { refreshToken } = refreshSchema.parse(request.body);
+
+      const count = await authService.revokeOtherSessions(user.userId, refreshToken);
+
+      reply.status(200).send({
+        success: true,
+        data: { message: `${count} other session(s) revoked successfully` },
+        meta: {
+          requestId: request.id,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } catch (err) {
+      const error = err as Error;
+      reply.status(400).send({
+        success: false,
+        error: {
+          message: error.message,
+          statusCode: 400,
+        },
+        meta: {
+          requestId: request.id,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    }
   });
 }

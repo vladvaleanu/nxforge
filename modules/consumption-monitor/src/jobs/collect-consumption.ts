@@ -1,10 +1,11 @@
 /**
  * Collect Consumption Job
  * Scrapes all enabled power meter endpoints and stores consumption readings
+ * Uses the core browserService via JobContext
  */
 
-import type { JobContext } from '@nxforge/core';
-import { ScrapingService } from '@nxforge/core';
+import type { JobContext } from '../types/index.js';
+import { scrape, type AuthConfig, type ScrapingConfig } from '../lib/scraper.js';
 
 interface JobConfig {
   batchSize?: number;
@@ -27,11 +28,20 @@ interface ProcessingResults {
   errors: Array<{ endpoint: string; error: string }>;
 }
 
+interface Endpoint {
+  id: string;
+  name: string;
+  ipAddress: string;
+  authType: string;
+  authConfig: AuthConfig | null;
+  scrapingConfig: ScrapingConfig | null;
+}
+
 /**
  * Main job handler for collecting consumption data
  */
 export default async function collectConsumption(context: JobContext): Promise<JobResult> {
-  const { logger, prisma } = context.services;
+  const { prisma, logger } = context.services;
   const { batchSize = 5, screenshotOnError = true } = (context.config || {}) as JobConfig;
 
   logger.info('[CollectConsumption] Starting consumption collection job');
@@ -41,7 +51,7 @@ export default async function collectConsumption(context: JobContext): Promise<J
     const endpoints = await prisma.endpoint.findMany({
       where: { enabled: true },
       orderBy: { name: 'asc' },
-    });
+    }) as Endpoint[];
 
     if (endpoints.length === 0) {
       logger.info('[CollectConsumption] No enabled endpoints found');
@@ -74,14 +84,11 @@ export default async function collectConsumption(context: JobContext): Promise<J
 
       // Process batch concurrently
       await Promise.all(
-        batch.map((endpoint: any) =>
-          processEndpoint(endpoint, logger, prisma, screenshotOnError, results)
+        batch.map((endpoint) =>
+          processEndpoint(endpoint, context, screenshotOnError, results)
         )
       );
     }
-
-    // Clean up scraping service (close browsers)
-    await ScrapingService.closeAllBrowsers();
 
     logger.info(
       `[CollectConsumption] Job completed. Success: ${results.successful}, Failed: ${results.failed}`
@@ -96,14 +103,6 @@ export default async function collectConsumption(context: JobContext): Promise<J
     };
   } catch (error: any) {
     logger.error(`[CollectConsumption] Job failed: ${error.message}`, { error });
-
-    // Make sure to close scraping service even on error
-    try {
-      await ScrapingService.closeAllBrowsers();
-    } catch (closeError) {
-      // Ignore cleanup errors
-    }
-
     throw error;
   }
 }
@@ -112,23 +111,26 @@ export default async function collectConsumption(context: JobContext): Promise<J
  * Process a single endpoint
  */
 async function processEndpoint(
-  endpoint: { id: string; name: string; ipAddress: string; authType: string; authConfig: any; scrapingConfig: any },
-  logger: { info: (msg: string) => void; error: (msg: string, meta?: any) => void },
-  prisma: any,
+  endpoint: Endpoint,
+  context: JobContext,
   screenshotOnError: boolean,
   results: ProcessingResults
 ): Promise<void> {
+  const { prisma, browser: browserService, logger } = context.services;
   const startTime = Date.now();
 
   try {
     logger.info(`[CollectConsumption] Scraping endpoint: ${endpoint.name} (${endpoint.ipAddress})`);
 
-    // Perform scraping
-    const result = await ScrapingService.scrape(
+    // Perform scraping using the core browserService
+    const result = await scrape(
+      browserService,
       `http://${endpoint.ipAddress}`,
+      endpoint.authType as 'none' | 'basic' | 'form',
       endpoint.authConfig,
       endpoint.scrapingConfig,
-      { screenshotOnError }
+      { screenshotOnError },
+      logger
     );
 
     if (!result.success) {
@@ -146,7 +148,6 @@ async function processEndpoint(
     });
 
     // Calculate current month usage
-    // For the first day of a new month, we want the delta from last month's last reading
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
@@ -172,8 +173,7 @@ async function processEndpoint(
           currentKwh = result.value - firstReadingThisMonth.totalKwh;
         }
       } else {
-        // New month - this is first reading, delta is 0
-        // (will calculate properly once we have more readings)
+        // New month - first reading, delta is 0
         currentKwh = 0;
       }
     }

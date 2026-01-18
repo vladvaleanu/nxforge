@@ -136,10 +136,10 @@ class BrowserSessionImpl implements BrowserSession {
 
   constructor(
     private sessionId: string,
-    private browser: Browser,
+    private _browser: Browser, // Stored for potential future use (e.g., lifecycle management)
     private context: BrowserContext,
     private service: BrowserService
-  ) {}
+  ) { }
 
   /**
    * Create a new page in this session
@@ -165,7 +165,7 @@ class BrowserSessionImpl implements BrowserSession {
     }
 
     // Close all pages
-    await Promise.all(this.pages.map((page) => page.close().catch(() => {})));
+    await Promise.all(this.pages.map((page) => page.close().catch(() => { })));
     this.pages = [];
 
     // Close context and browser via service
@@ -193,6 +193,13 @@ class BrowserSessionImpl implements BrowserSession {
    */
   isClosed(): boolean {
     return this.closed;
+  }
+
+  /**
+   * Get the browser instance for this session
+   */
+  getBrowser(): Browser {
+    return this._browser;
   }
 }
 

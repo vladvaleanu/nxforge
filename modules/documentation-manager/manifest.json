@@ -1,0 +1,82 @@
+{
+  "name": "documentation-manager",
+  "version": "1.0.0",
+  "displayName": "Documentation Manager",
+  "description": "Centralized knowledge base for procedures, technical documents, guides, and operational documentation",
+  "author": "NxForge Team",
+  "license": "MIT",
+  "entry": "./src/index.ts",
+  "migrations": "migrations",
+  "routes": [],
+  "jobs": {},
+  "ui": {
+    "entry": "frontend/pages/DocumentationPage.tsx",
+    "sidebar": {
+      "label": "Documentation",
+      "icon": "BookOpen",
+      "order": 10,
+      "children": [
+        {
+          "label": "Browse",
+          "path": "/documentation",
+          "icon": "FileText"
+        }
+      ]
+    },
+    "routes": [
+      {
+        "path": "/documentation",
+        "component": "frontend/pages/DocumentationPage.tsx"
+      }
+    ]
+  },
+  "permissions": [
+    "docs:read",
+    "docs:write",
+    "docs:delete",
+    "docs:admin"
+  ],
+  "dependencies": {},
+  "settings": {
+    "maxFileSize": {
+      "type": "number",
+      "label": "Maximum File Size",
+      "description": "Maximum file size in bytes",
+      "default": 10485760
+    },
+    "allowedFileTypes": {
+      "type": "json",
+      "label": "Allowed File Types",
+      "description": "List of allowed file extensions",
+      "default": [
+        "pdf",
+        "doc",
+        "docx",
+        "xls",
+        "xlsx",
+        "png",
+        "jpg",
+        "jpeg",
+        "gif"
+      ]
+    },
+    "enableVersioning": {
+      "type": "boolean",
+      "label": "Enable Versioning",
+      "description": "Track document version history",
+      "default": true
+    },
+    "enableWorkflow": {
+      "type": "boolean",
+      "label": "Enable Workflow",
+      "description": "Enable document approval workflow",
+      "default": false
+    },
+    "defaultCategory": {
+      "type": "string",
+      "label": "Default Category",
+      "description": "Default category for new documents",
+      "default": "general"
+    }
+  }
+}

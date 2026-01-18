@@ -5,20 +5,12 @@
   "description": "Automated power consumption monitoring for colocation racks - scrapes power meters, tracks kWh usage, generates reports and alerts",
   "author": "NxForge",
   "license": "MIT",
-  "entry": "./dist/index.js",
-  "routes": [
-    {
-      "method": "GET",
-      "path": "/*",
-      "handler": "./dist/routes/index.js",
-      "description": "Consumption monitoring routes (registers /readings, /monthly/:endpointId, /summary, /live)"
-    }
-  ],
+  "entry": "./src/index.ts",
   "jobs": {
     "collect-consumption": {
       "name": "Collect Consumption Data",
       "description": "Scrapes power meters and collects kWh consumption data from all enabled rack endpoints",
-      "handler": "./dist/jobs/collect-consumption.js",
+      "handler": "./src/jobs/collect-consumption.ts",
       "schedule": null,
       "timeout": 300000,
       "retries": 2,

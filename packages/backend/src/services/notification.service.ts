@@ -6,7 +6,6 @@
 import nodemailer, { Transporter } from 'nodemailer';
 import axios from 'axios';
 import { logger } from '../config/logger.js';
-import { env } from '../config/env.js';
 import { TIMEOUTS, HTTP_STATUS } from '../config/constants.js';
 import type {
   NotificationService as INotificationService,
@@ -31,7 +30,7 @@ export class NotificationService implements INotificationService {
     const smtpPort = process.env.SMTP_PORT;
     const smtpUser = process.env.SMTP_USER;
     const smtpPass = process.env.SMTP_PASS;
-    const smtpFrom = process.env.SMTP_FROM || 'noreply@nxforge.local';
+    // Note: SMTP_FROM is used directly via process.env.SMTP_FROM in the email method
 
     if (smtpHost && smtpPort && smtpUser && smtpPass) {
       try {

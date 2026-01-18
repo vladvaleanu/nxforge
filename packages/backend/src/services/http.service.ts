@@ -3,7 +3,7 @@
  * Provides HTTP client with retry logic and timeout handling
  */
 
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
+import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
 import { logger } from '../config/logger.js';
 import { TIMEOUTS, HTTP_RETRY, HTTP_STATUS } from '../config/constants.js';
 import type {

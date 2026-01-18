@@ -3,7 +3,7 @@
  * Configures global test environment
  */
 
-import { beforeAll, afterAll, vi } from 'vitest';
+import { afterAll, vi } from 'vitest';
 
 // Set test environment variables
 process.env.NODE_ENV = 'test';

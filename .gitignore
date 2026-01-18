@@ -8,6 +8,19 @@ dist/
 build/
 *.tsbuildinfo
 
+# Compiled TypeScript in src directories (keep source, ignore output)
+packages/*/src/**/*.js
+packages/*/src/**/*.js.map
+packages/*/src/**/*.d.ts
+packages/*/src/**/*.d.ts.map
+modules/*/src/**/*.js
+modules/*/src/**/*.js.map
+modules/*/src/**/*.d.ts
+modules/*/src/**/*.d.ts.map
+
+# Module dist folders (compiled output)
+modules/*/dist/
+
 # Testing
 coverage/
 .nyc_output/
@@ -50,7 +63,6 @@ temp/
 *.db
 *.sqlite
 *.sqlite3
-prisma/migrations/
 
 # Docker
 .docker/
@@ -61,3 +73,6 @@ docker-compose.override.yml
 .parcel-cache/
 .next/
 .nuxt/
+
+# Uploads
+packages/backend/uploads/

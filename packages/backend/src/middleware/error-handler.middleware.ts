@@ -145,7 +145,7 @@ export function errorHandler(
     requestId: request.id,
     method: request.method,
     url: request.url,
-    statusCode: 'statusCode' in error ? error.statusCode : 500,
+    statusCode: 'statusCode' in error ? (error.statusCode ?? 500) : 500,
     error: error.message,
     stack: error.stack,
   };

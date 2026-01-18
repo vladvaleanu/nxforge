@@ -4,10 +4,10 @@
  * Uses BullMQ for all job operations (replaces JobQueueService, JobSchedulerService, WorkerService)
  */
 
-import { Queue, Worker, QueueEvents, Job as BullJob } from 'bullmq';
+import { Queue, Worker, QueueEvents, Job as BullJob, JobsOptions } from 'bullmq';
 import { parseExpression } from 'cron-parser';
 import { createRedisConnection } from '../lib/redis.js';
-import { prisma } from '../lib/prisma.js';
+import { prisma, Prisma } from '../lib/prisma.js';
 import { logger } from '../config/logger.js';
 import { jobExecutorService } from './job-executor.service.js';
 import { JOB_CONFIG, TIMEOUTS } from '../config/constants.js';
@@ -107,7 +107,7 @@ export class JobService {
         data: {
           status: 'COMPLETED',
           completedAt,
-          result: result as any,
+          result: result as Prisma.InputJsonValue,
         },
       });
 
@@ -221,8 +221,7 @@ export class JobService {
           pattern: cronExpression,
         },
         attempts: job.retries,
-        timeout: job.timeout,
-      }
+      } satisfies JobsOptions
     );
 
     // Calculate the next run time using cron-parser
@@ -299,8 +298,7 @@ export class JobService {
       },
       {
         attempts: job.retries,
-        timeout: job.timeout,
-      }
+      } satisfies JobsOptions
     );
 
     return bullJob.id!;

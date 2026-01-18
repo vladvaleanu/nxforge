@@ -135,10 +135,14 @@ model ModuleDependency {
 enum ModuleStatus {
   REGISTERED
   INSTALLING
+  INSTALLED
+  ENABLING
   ENABLED
+  DISABLING
   DISABLED
   UPDATING
   REMOVING
+  ERROR
 }
 
 // Audit logs
@@ -324,6 +328,21 @@ model ConsumptionReading {
 // Module Migration Tracking
 // ============================================================================
 
+// User preferences (dashboard layout, settings, etc.)
+model UserPreference {
+  id        String   @id @default(uuid())
+  userId    String
+  key       String   // preference key (e.g., "dashboard_layout")
+  value     String   // JSON string value
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, key])
+  @@index([userId])
+  @@map("user_preferences")
+}
+
 // Tracks which migrations have been applied for each module
 model ModuleMigration {
   id          String   @id @default(uuid())
@@ -341,4 +360,191 @@ model ModuleMigration {
   @@index([moduleName])
   @@index([appliedAt])
   @@map("module_migrations")
+}
+
+// ============================================================================
+// Documentation Manager Module
+// ============================================================================
+
+// Document categories
+model DocumentCategory {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  icon        String?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  folders     DocumentFolder[]
+  documents   Document[]
+  permissions DocumentCategoryPermission[]
+
+  @@map("document_categories")
+}
+
+// Hierarchical folder structure
+model DocumentFolder {
+  id          String   @id @default(uuid())
+  name        String
+  categoryId  String   @map("category_id")
+  parentId    String?  @map("parent_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  category    DocumentCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  parent      DocumentFolder?  @relation("FolderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children    DocumentFolder[] @relation("FolderHierarchy")
+  documents   Document[]
+
+  @@index([categoryId])
+  @@index([parentId])
+  @@map("document_folders")
+}
+
+// Document status enum
+enum DocumentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+// Main documents table
+model Document {
+  id          String         @id @default(uuid())
+  title       String
+  slug        String         @unique
+  content     String
+  contentHtml String?        @map("content_html")
+  excerpt     String?
+  categoryId  String         @map("category_id")
+  folderId    String?        @map("folder_id")
+  authorId    String         @map("author_id")
+  status      DocumentStatus @default(DRAFT)
+  publishedAt DateTime?      @map("published_at")
+  createdAt   DateTime       @default(now()) @map("created_at")
+  updatedAt   DateTime       @updatedAt @map("updated_at")
+
+  // Relations
+  category    DocumentCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  folder      DocumentFolder?  @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  versions    DocumentVersion[]
+  attachments DocumentAttachment[]
+  tags        DocumentTag[]
+  permissions DocumentPermission[]
+
+  @@index([categoryId])
+  @@index([folderId])
+  @@index([slug])
+  @@index([status])
+  @@index([authorId])
+  @@map("documents")
+}
+
+// Permission levels enum
+enum DocumentPermissionLevel {
+  VIEW
+  EDIT
+  ADMIN
+}
+
+// Category-level permissions
+model DocumentCategoryPermission {
+  id         String                  @id @default(uuid())
+  categoryId String                  @map("category_id")
+  userId     String?                 @map("user_id")
+  permission DocumentPermissionLevel
+  createdAt  DateTime                @default(now()) @map("created_at")
+
+  // Relations
+  category   DocumentCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([categoryId, userId])
+  @@index([categoryId])
+  @@map("document_category_permissions")
+}
+
+// Document-level permissions
+model DocumentPermission {
+  id         String                  @id @default(uuid())
+  documentId String                  @map("document_id")
+  userId     String?                 @map("user_id")
+  permission DocumentPermissionLevel
+  createdAt  DateTime                @default(now()) @map("created_at")
+
+  // Relations
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, userId])
+  @@index([documentId])
+  @@map("document_permissions")
+}
+
+// Tags
+model Tag {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  color     String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  documents DocumentTag[]
+
+  @@map("tags")
+}
+
+// Document-Tag junction
+model DocumentTag {
+  id         String   @id @default(uuid())
+  documentId String   @map("document_id")
+  tagId      String   @map("tag_id")
+
+  // Relations
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, tagId])
+  @@index([documentId])
+  @@index([tagId])
+  @@map("document_tags")
+}
+
+// Document versions
+model DocumentVersion {
+  id         String   @id @default(uuid())
+  documentId String   @map("document_id")
+  version    Int
+  title      String
+  content    String
+  authorId   String   @map("author_id")
+  changeNote String?  @map("change_note")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  // Relations
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, version])
+  @@index([documentId])
+  @@map("document_versions")
+}
+
+// File attachments
+model DocumentAttachment {
+  id         String   @id @default(uuid())
+  documentId String?  @map("document_id")
+  filename   String
+  filepath   String
+  mimetype   String
+  size       Int
+  uploadedBy String   @map("uploaded_by")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  // Relations
+  document   Document? @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@index([uploadedBy])
+  @@map("document_attachments")
 }

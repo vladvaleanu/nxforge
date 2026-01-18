@@ -10,7 +10,6 @@ import { PAGINATION } from '../config/constants.js';
 import { parsePagination, createPaginationMeta } from '../utils/pagination.utils.js';
 import { createPaginatedResponse } from '../utils/response.utils.js';
 import { buildWhereClause } from '../utils/query.utils.js';
-import type { ListExecutionsQuery } from '../types/job.types.js';
 
 // Validation schemas
 const listExecutionsSchema = z.object({
@@ -175,7 +174,7 @@ export const executionsRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // Get execution statistics
-  fastify.get('/stats/summary', async (request, reply) => {
+  fastify.get('/stats/summary', async (_request, reply) => {
     // Use groupBy to get all status counts in a single query instead of 7 separate queries
     const statusStats = await prisma.jobExecution.groupBy({
       by: ['status'],
@@ -231,7 +230,7 @@ export const executionsRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // Get recent executions (last 24 hours)
-  fastify.get('/stats/recent', async (request, reply) => {
+  fastify.get('/stats/recent', async (_request, reply) => {
     const last24Hours = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
     const executions = await prisma.jobExecution.findMany({

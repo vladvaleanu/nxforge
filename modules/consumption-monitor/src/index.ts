@@ -1,18 +1,40 @@
-/**
- * Consumption Monitor Module
- * Entry point for the consumption monitoring module
- */
+import { FastifyPluginAsync } from 'fastify';
+import { registerRoutes } from './routes/index.js';
+import { ModuleContext } from './types/index.js';
 
-import type { ModuleContext } from '@nxforge/core';
+const plugin: FastifyPluginAsync = async (app) => {
+  app.log.info('[ConsumptionMonitor] Module initialized');
 
-export async function initialize(context: ModuleContext): Promise<void> {
-  const { logger } = context.services;
+  // Get services from app decoration (provided by core)
+  const prisma = (app as any).prisma;
+  const browserService = (app as any).browserService;
 
-  logger.info('[ConsumptionMonitor] Module initialized');
-}
+  if (!prisma) {
+    app.log.error('Prisma instance not found on app decoration');
+    throw new Error('Prisma instance not found on app decoration');
+  }
 
-export async function cleanup(context: ModuleContext): Promise<void> {
-  const { logger } = context.services;
+  if (!browserService) {
+    app.log.error('BrowserService not found on app decoration');
+    throw new Error('BrowserService not found on app decoration');
+  }
 
-  logger.info('[ConsumptionMonitor] Module cleaned up');
-}
+  const context: ModuleContext = {
+    module: {
+      id: 'consumption-monitor',
+      name: 'consumption-monitor',
+      version: '1.0.0',
+    },
+    services: {
+      prisma,
+      logger: app.log as any,
+      browser: browserService,
+    }
+  };
+
+  // Register routes
+  // Routes are defined in routes/index.ts
+  await registerRoutes(app, context);
+};
+
+export default plugin;

@@ -9,9 +9,8 @@ import { prisma } from '../lib/prisma.js';
 import { eventBusService } from '../services/event-bus.service.js';
 import { PAGINATION } from '../config/constants.js';
 import { parsePagination, createPaginationMeta } from '../utils/pagination.utils.js';
-import { createPaginatedResponse, createSuccessResponse } from '../utils/response.utils.js';
+import { createPaginatedResponse } from '../utils/response.utils.js';
 import { buildWhereClause } from '../utils/query.utils.js';
-import type { ListEventsQuery } from '../types/job.types.js';
 
 // Validation schemas
 const emitEventSchema = z.object({
@@ -103,7 +102,7 @@ export const eventsRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // Get event statistics
-  fastify.get('/stats/summary', async (request, reply) => {
+  fastify.get('/stats/summary', async (_request, reply) => {
     const [total, last24h, last7d] = await Promise.all([
       prisma.event.count(),
       prisma.event.count({
@@ -169,7 +168,7 @@ export const eventsRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // Get event subscriptions
-  fastify.get('/subscriptions', async (request, reply) => {
+  fastify.get('/subscriptions', async (_request, reply) => {
     const stats = eventBusService.getStats();
 
     return reply.send({

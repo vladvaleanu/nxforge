@@ -111,8 +111,9 @@ function ModulesPageContent() {
           variant: 'warning',
         }
       );
-    } else if (module.status === ModuleStatus.DISABLED || module.status === ModuleStatus.INSTALLED) {
+    } else if (module.status === ModuleStatus.DISABLED || module.status === ModuleStatus.INSTALLED || module.status === ModuleStatus.REGISTERED) {
       // Enabling - use info variant (less risky)
+      // REGISTERED modules will be auto-installed by the backend
       confirm(
         () => enableMutation.mutateAsync(module.name),
         {
@@ -122,9 +123,6 @@ function ModulesPageContent() {
           variant: 'info',
         }
       );
-    } else if (module.status === ModuleStatus.REGISTERED) {
-      // Module is only registered, needs to be installed first
-      showError(`Module "${module.displayName}" must be installed before it can be enabled. Current status: REGISTERED`);
     } else {
       showError(`Cannot toggle module with status: ${module.status}`);
     }
@@ -274,7 +272,7 @@ function ModulesPageContent() {
                       : '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                    {(module.status === ModuleStatus.ENABLED || module.status === ModuleStatus.DISABLED || module.status === ModuleStatus.INSTALLED) && (
+                    {(module.status === ModuleStatus.ENABLED || module.status === ModuleStatus.DISABLED || module.status === ModuleStatus.INSTALLED || module.status === ModuleStatus.REGISTERED) && (
                       <button
                         onClick={() => handleToggleModule(module)}
                         disabled={enableMutation.isPending || disableMutation.isPending}

@@ -17,10 +17,11 @@ export interface ModuleManifest {
   license?: string;                // License type (e.g., "MIT")
 
   // Module structure
-  entry: string;                   // Backend entry point (e.g., "./dist/index.js")
+  entry: string;                   // Backend entry point - MUST export a Fastify plugin as default
+  // The plugin will be registered at /api/v1/m/{module-name}
 
   // Backend configuration
-  routes?: RouteDefinition[];      // API routes to register
+  routes?: RouteDefinition[];      // Legacy route definitions (deprecated, use plugin-based approach)
   jobs?: Record<string, JobDefinition>;  // Job handlers (keyed by job ID)
   migrations?: string;             // Path to migrations directory
 
@@ -35,6 +36,12 @@ export interface ModuleManifest {
 
   // Settings schema
   settings?: Record<string, SettingDefinition>;  // Module-specific settings
+
+  // Configuration schema (for runtime config validation)
+  config?: {
+    schema?: Record<string, SettingDefinition>;  // Config field definitions
+    defaults?: Record<string, any>;              // Default values
+  };
 
   // Metadata
   metadata?: {
@@ -188,16 +195,9 @@ export interface ModuleContext {
 
 /**
  * Context provided to job handlers
+ * Re-exported from job.types.ts for convenience - DO NOT DUPLICATE
  */
-export interface JobContext {
-  config?: Record<string, any>;
-  module: {
-    id: string;
-    name: string;
-    config?: Record<string, any>;
-  };
-  services: ModuleServices;
-}
+export type { JobContext } from './job.types.js';
 
 /**
  * Services available to modules

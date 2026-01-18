@@ -9,7 +9,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import Layout from './components/Layout';
 import OfflineBanner from './components/OfflineBanner';
-import LoadingSpinner from './components/LoadingSpinner';
+import { PageSkeleton } from './components/Skeleton';
 import ProtectedRoute from './components/ProtectedRoute';
 import './index.css';
 
@@ -31,6 +31,14 @@ const EndpointsPage = lazy(() => import('./pages/EndpointsPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
 const HistoryPage = lazy(() => import('./pages/HistoryPage'));
 
+// Settings pages
+const SettingsProfilePage = lazy(() => import('./pages/SettingsProfilePage'));
+const SettingsUsersPage = lazy(() => import('./pages/SettingsUsersPage'));
+const SettingsSystemPage = lazy(() => import('./pages/SettingsSystemPage'));
+
+// Module pages
+const DocumentationPage = lazy(() => import('./modules/documentation-manager/pages/DocumentationPage'));
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -48,8 +56,8 @@ function App() {
       <ThemeProvider>
         <AuthProvider>
           <OfflineBanner />
-          <BrowserRouter>
-            <Suspense fallback={<LoadingSpinner text="Loading..." />}>
+          <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+            <Suspense fallback={<PageSkeleton />}>
               <Routes>
                 {/* Public routes */}
                 <Route path="/login" element={<LoginPage />} />
@@ -66,122 +74,166 @@ function App() {
                     </ProtectedRoute>
                   }
                 />
-              <Route
-                path="/modules"
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <ModulesPage />
-                    </Layout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/jobs"
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <JobsPage />
-                    </Layout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/jobs/new"
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <CreateJobPage />
-                    </Layout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/jobs/:jobId/executions"
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <ExecutionsPage />
-                    </Layout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/executions"
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <ExecutionsPage />
-                    </Layout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/executions/:id"
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <ExecutionDetailPage />
-                    </Layout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/events"
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <EventsPage />
-                    </Layout>
-                  </ProtectedRoute>
-                }
-              />
+                <Route
+                  path="/modules"
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <ModulesPage />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/jobs"
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <JobsPage />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/jobs/new"
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <CreateJobPage />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/jobs/:jobId/executions"
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <ExecutionsPage />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/executions"
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <ExecutionsPage />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/executions/:id"
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <ExecutionDetailPage />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/events"
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <EventsPage />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
 
-              {/* Consumption Monitoring Routes */}
-              <Route
-                path="/consumption/live"
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <LiveDashboardPage />
-                    </Layout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/consumption/endpoints"
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <EndpointsPage />
-                    </Layout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/consumption/reports"
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <ReportsPage />
-                    </Layout>
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/consumption/history"
-                element={
-                  <ProtectedRoute>
-                    <Layout>
-                      <HistoryPage />
-                    </Layout>
-                  </ProtectedRoute>
-                }
-              />
+                {/* Consumption Monitoring Routes */}
+                <Route
+                  path="/consumption/live"
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <LiveDashboardPage />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/consumption/endpoints"
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <EndpointsPage />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/consumption/reports"
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <ReportsPage />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/consumption/history"
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <HistoryPage />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
 
-              {/* Default redirect */}
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                {/* Settings Routes */}
+                <Route
+                  path="/settings/profile"
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <SettingsProfilePage />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/settings/users"
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <SettingsUsersPage />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/settings/system"
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <SettingsSystemPage />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
+
+                {/* Module Routes */}
+                <Route
+                  path="/documentation"
+                  element={
+                    <ProtectedRoute>
+                      <Layout>
+                        <DocumentationPage />
+                      </Layout>
+                    </ProtectedRoute>
+                  }
+                />
+
+                {/* Default redirect */}
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Routes>
             </Suspense>
           </BrowserRouter>

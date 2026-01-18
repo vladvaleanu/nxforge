@@ -13,7 +13,7 @@ import { ERROR_MESSAGES, JOB_CONFIG, TIMEOUTS, PAGINATION } from '../config/cons
 import { parsePagination, createPaginationMeta } from '../utils/pagination.utils.js';
 import { createPaginatedResponse } from '../utils/response.utils.js';
 import { buildWhereClause, parseBoolean } from '../utils/query.utils.js';
-import type { CreateJobDTO, UpdateJobDTO, ListJobsQuery } from '../types/job.types.js';
+import type { Job } from '../types/job.types.js';
 
 // Validation schemas
 const createJobSchema = z.object({
@@ -31,7 +31,8 @@ const createJobSchema = z.object({
 const updateJobSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().optional(),
-  schedule: z.string().optional(),
+  handler: z.string().min(1).optional(),
+  schedule: z.string().nullable().optional(), // nullable to allow removing schedule
   enabled: z.boolean().optional(),
   timeout: z.number().int().positive().optional(),
   retries: z.number().int().nonnegative().optional(),
@@ -160,7 +161,7 @@ export const jobsRoutes: FastifyPluginAsync = async (fastify) => {
         timeout: body.timeout ?? 300000,
         retries: body.retries ?? 3,
         config: body.config || {},
-        createdBy: (request.user as any)?.id,
+        createdBy: request.user?.userId,
       },
       include: {
         schedules: true,
@@ -169,7 +170,7 @@ export const jobsRoutes: FastifyPluginAsync = async (fastify) => {
 
     // Schedule the job if cron expression provided
     if (body.schedule && job.enabled) {
-      await jobService.scheduleJob(job as any, body.schedule);
+      await jobService.scheduleJob(job as unknown as Job, body.schedule);
     }
 
     return reply.status(201).send({
@@ -186,6 +187,7 @@ export const jobsRoutes: FastifyPluginAsync = async (fastify) => {
     // Check job exists
     const existingJob = await prisma.job.findUnique({
       where: { id },
+      include: { schedules: true },
     });
 
     if (!existingJob) {
@@ -195,11 +197,19 @@ export const jobsRoutes: FastifyPluginAsync = async (fastify) => {
       });
     }
 
-    // Validate cron expression if provided
+    // Check if job is currently running (warn but allow update)
+    const runningExecution = await prisma.jobExecution.findFirst({
+      where: {
+        jobId: id,
+        status: 'RUNNING',
+      },
+    });
+
+    // Validate cron expression if provided (and not null - null means remove schedule)
     if (body.schedule && !validateCronExpression(body.schedule)) {
       return reply.status(400).send({
         success: false,
-        error: 'Invalid cron expression', // TODO: Add to ERROR_MESSAGES constant
+        error: 'Invalid cron expression',
       });
     }
 
@@ -209,6 +219,7 @@ export const jobsRoutes: FastifyPluginAsync = async (fastify) => {
       data: {
         name: body.name,
         description: body.description,
+        handler: body.handler,
         schedule: body.schedule,
         enabled: body.enabled,
         timeout: body.timeout,
@@ -220,18 +231,29 @@ export const jobsRoutes: FastifyPluginAsync = async (fastify) => {
       },
     });
 
-    // Update schedule if changed
-    if (body.schedule !== undefined) {
-      if (body.schedule && job.enabled) {
-        await jobService.scheduleJob(job as any, body.schedule);
-      } else {
-        await jobService.unscheduleJob(job.id);
+    // Determine if we need to update the BullMQ schedule
+    const scheduleChanged = body.schedule !== undefined;
+    const enabledChanged = body.enabled !== undefined && body.enabled !== existingJob.enabled;
+    const newEnabled = body.enabled ?? existingJob.enabled;
+    const newSchedule = body.schedule !== undefined ? body.schedule : existingJob.schedule;
+
+    // Update BullMQ schedule when schedule or enabled status changes
+    if (scheduleChanged || enabledChanged) {
+      // First, unschedule the existing job
+      await jobService.unscheduleJob(job.id);
+
+      // Then reschedule if job is enabled and has a valid schedule
+      if (newEnabled && newSchedule) {
+        await jobService.scheduleJob(job as unknown as Job, newSchedule);
       }
     }
 
     return reply.send({
       success: true,
       data: job,
+      warning: runningExecution
+        ? 'Job is currently running. Changes will apply to future executions.'
+        : undefined,
     });
   });
 
@@ -288,7 +310,7 @@ export const jobsRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     // Trigger job execution
-    const bullJobId = await jobService.triggerJob(job as any);
+    const bullJobId = await jobService.triggerJob(job as unknown as Job);
 
     return reply.send({
       success: true,
@@ -309,7 +331,7 @@ export const jobsRoutes: FastifyPluginAsync = async (fastify) => {
 
     // Schedule the job
     if (job.schedule) {
-      await jobService.scheduleJob(job as any, job.schedule);
+      await jobService.scheduleJob(job as unknown as Job, job.schedule);
     }
 
     return reply.send({
@@ -337,7 +359,7 @@ export const jobsRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // Get queue metrics
-  fastify.get('/metrics/queue', async (request, reply) => {
+  fastify.get('/metrics/queue', async (_request, reply) => {
     const metrics = await jobService.getMetrics();
 
     return reply.send({
@@ -347,7 +369,7 @@ export const jobsRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // Get worker status
-  fastify.get('/metrics/worker', async (request, reply) => {
+  fastify.get('/metrics/worker', async (_request, reply) => {
     const metrics = await jobService.getMetrics();
 
     return reply.send({

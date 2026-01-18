@@ -5,7 +5,7 @@
 
 import { Redis } from 'ioredis';
 import { createRedisConnection } from '../lib/redis.js';
-import { prisma } from '../lib/prisma.js';
+import { prisma, Prisma } from '../lib/prisma.js';
 import { logger } from '../config/logger.js';
 import type { EventBusService as IEventBusService, EventHandler, Event } from '../types/job.types.js';
 
@@ -62,7 +62,7 @@ export class EventBusService implements IEventBusService {
           id: event.id,
           name: event.name,
           source: event.source,
-          payload: event.payload as any,
+          payload: event.payload as Prisma.InputJsonValue,
           createdAt: event.createdAt,
         },
       });

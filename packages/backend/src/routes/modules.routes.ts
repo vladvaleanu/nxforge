@@ -1,5 +1,8 @@
 /**
  * Module registry API routes
+ * Note: Schema objects use 'description' and 'tags' properties for future
+ * OpenAPI/Swagger documentation. These are cast to 'as any' since
+ * @fastify/swagger is not currently installed.
  */
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';

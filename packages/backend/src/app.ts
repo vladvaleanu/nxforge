@@ -10,6 +10,7 @@ import { env } from './config/env';
 import { logger } from './config/logger';
 import { authRoutes } from './routes/auth.routes';
 import { prisma } from './lib/prisma';
+import { browserService } from './services/browser.service';
 import { ModuleLoaderService } from './services/module-loader.service';
 import { errorHandler, notFoundHandler } from './middleware/error-handler.middleware';
 
@@ -17,7 +18,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   logger.info('Building Fastify app...');
 
   const app = Fastify({
-    logger,
+    logger: logger as any, // Use our configured Pino logger
     requestIdHeader: 'x-request-id',
     requestIdLogLabel: 'requestId',
     disableRequestLogging: false,
@@ -29,6 +30,10 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
 
   logger.info('Fastify instance created');
+
+  // Decorate app with services for modules
+  app.decorate('prisma', prisma);
+  app.decorate('browserService', browserService);
 
   // CORS configuration with origin validation
   app.addHook('onRequest', async (request: FastifyRequest, reply: FastifyReply) => {
@@ -77,7 +82,7 @@ export async function buildApp(): Promise<FastifyInstance> {
       return request.ip || request.headers['x-real-ip'] as string || request.headers['x-forwarded-for'] as string || 'unknown';
     },
     // Error response when rate limit exceeded
-    errorResponseBuilder: (request, context) => {
+    errorResponseBuilder: (_request, context) => {
       return {
         success: false,
         error: 'Too many requests. Please try again later.',
@@ -213,6 +218,48 @@ export async function buildApp(): Promise<FastifyInstance> {
 
     // NOTE: Endpoints and consumption routes have been moved to the consumption-monitor module
     // They are now loaded dynamically via the module system (see ModuleLoaderService)
+
+    // Register user management routes (admin only)
+    try {
+      app.log.info('Attempting to import users routes...');
+      const { usersRoutes } = await import('./routes/users.routes.js');
+      app.log.info('Users routes imported successfully');
+
+      app.log.info('Registering users routes...');
+      await instance.register(usersRoutes, { prefix: '/users' });
+      app.log.info('Users routes registered successfully');
+    } catch (error) {
+      app.log.error(error, 'Failed to load/register users routes');
+      throw error;
+    }
+
+    // Register system settings routes (admin only)
+    try {
+      app.log.info('Attempting to import settings routes...');
+      const { settingsRoutes } = await import('./routes/settings.routes.js');
+      app.log.info('Settings routes imported successfully');
+
+      app.log.info('Registering settings routes...');
+      await instance.register(settingsRoutes, { prefix: '/settings' });
+      app.log.info('Settings routes registered successfully');
+    } catch (error) {
+      app.log.error(error, 'Failed to load/register settings routes');
+      throw error;
+    }
+
+    // Register dashboard routes (authenticated users)
+    try {
+      app.log.info('Attempting to import dashboard routes...');
+      const { dashboardRoutes } = await import('./routes/dashboard.routes.js');
+      app.log.info('Dashboard routes imported successfully');
+
+      app.log.info('Registering dashboard routes...');
+      await instance.register(dashboardRoutes, { prefix: '/dashboard' });
+      app.log.info('Dashboard routes registered successfully');
+    } catch (error) {
+      app.log.error(error, 'Failed to load/register dashboard routes');
+      throw error;
+    }
 
   }, { prefix: '/api/v1' });
 

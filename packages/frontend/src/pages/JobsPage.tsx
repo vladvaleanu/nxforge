@@ -123,6 +123,8 @@ export default function JobsPage() {
       });
       return response.data;
     },
+    staleTime: 0, // Always refetch on mount to ensure fresh data
+    refetchOnMount: 'always', // Force refetch when component mounts
   });
 
   // Execute job mutation

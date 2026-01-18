@@ -1087,8 +1087,7 @@ Example: Module Manifest (Consumption Monitor v2)
   },
   
   "dependencies": {
-    "@nxforge/core": "^5.0.0",
-    "puppeteer": "^21.0.0"
+    "@nxforge/core": "^5.0.0"
   },
   
   "permissions": [

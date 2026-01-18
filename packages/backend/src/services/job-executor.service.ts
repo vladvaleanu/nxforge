@@ -5,10 +5,9 @@
 
 import { pathToFileURL } from 'url';
 import * as path from 'path';
-import { prisma, Prisma } from '../lib/prisma.js';
+import { prisma } from '../lib/prisma.js';
 import { logger } from '../config/logger.js';
 import type { JobContext, JobHandler } from '../types/job.types.js';
-import { env } from '../config/env.js';
 import { browserService } from './browser.service.js';
 import { notificationService } from './notification.service.js';
 import { httpService } from './http.service.js';
@@ -57,19 +56,56 @@ export class JobExecutorService {
     // Build job context
     const context = this.buildJobContext(job, module, config, executionId);
 
+    // Emit job started event
+    await eventBusService.emit('job.started', {
+      jobId: job.id,
+      jobName: job.name,
+      executionId: executionId,
+      moduleName: module.name,
+      source: 'system',
+    });
+
     // Execute with timeout
     const timeoutMs = job.timeout || 300000; // Default 5 minutes
-    const result = await this.executeWithTimeout(
-      handler,
-      context,
-      timeoutMs,
-      executionId
-    );
+    let result;
+    try {
+      result = await this.executeWithTimeout(
+        handler,
+        context,
+        timeoutMs,
+        executionId
+      );
 
-    // Save logs to database
-    await this.saveLogs(executionId);
+      // Save logs to database
+      await this.saveLogs(executionId);
 
-    return result;
+      // Emit job completed event
+      await eventBusService.emit('job.completed', {
+        jobId: job.id,
+        jobName: job.name,
+        executionId: executionId,
+        moduleName: module.name,
+        duration: Date.now() - new Date(executionId.split('-')[1] || Date.now()).getTime(), // Approximate if not passed
+        source: 'system',
+      });
+
+      return result;
+    } catch (error) {
+      // Save logs to database even on failure
+      await this.saveLogs(executionId);
+
+      // Emit job failed event
+      await eventBusService.emit('job.failed', {
+        jobId: job.id,
+        jobName: job.name,
+        executionId: executionId,
+        moduleName: module.name,
+        error: error instanceof Error ? error.message : String(error),
+        source: 'system',
+      });
+
+      throw error;
+    }
   }
 
   /**
@@ -183,7 +219,7 @@ export class JobExecutorService {
     handler: JobHandler,
     context: JobContext,
     timeoutMs: number,
-    executionId: string
+    _executionId: string
   ): Promise<T> {
     return new Promise<T>(async (resolve, reject) => {
       const timeoutHandle = setTimeout(() => {

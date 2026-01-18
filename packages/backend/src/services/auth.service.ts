@@ -37,7 +37,7 @@ export interface AuthTokens {
 }
 
 export class AuthService {
-  constructor(private app: FastifyInstance) {}
+  constructor(private app: FastifyInstance) { }
 
   /**
    * Authenticate user with email and password
@@ -196,8 +196,13 @@ export class AuthService {
     // Generate access token
     const accessToken = this.app.jwt.sign(payload);
 
-    // Generate refresh token
-    const refreshToken = this.app.jwt.sign(
+    // Generate refresh token with custom secret
+    // Type assertion needed because @fastify/jwt doesn't expose the secret override option in types
+    const jwtSign = this.app.jwt.sign as unknown as (
+      payload: object,
+      options?: { secret?: string; expiresIn?: string }
+    ) => string;
+    const refreshToken = jwtSign(
       { userId: payload.userId },
       { secret: env.REFRESH_TOKEN_SECRET, expiresIn: env.REFRESH_TOKEN_EXPIRES_IN }
     );
@@ -225,10 +230,15 @@ export class AuthService {
    * Refresh access token using refresh token
    */
   async refreshTokens(refreshToken: string, userAgent?: string, ipAddress?: string): Promise<AuthTokens> {
-    // Verify refresh token
+    // Verify refresh token with custom secret
+    // Type assertion needed because @fastify/jwt doesn't expose the secret override option in types
     let decoded: { userId: string };
     try {
-      decoded = this.app.jwt.verify(refreshToken, { secret: env.REFRESH_TOKEN_SECRET }) as { userId: string };
+      const jwtVerify = this.app.jwt.verify as unknown as (
+        token: string,
+        options?: { secret?: string }
+      ) => { userId: string };
+      decoded = jwtVerify(refreshToken, { secret: env.REFRESH_TOKEN_SECRET });
     } catch (err) {
       throw new Error('Invalid refresh token');
     }
@@ -304,5 +314,199 @@ export class AuthService {
       case 'd': return value * 24 * 60 * 60 * 1000;
       default: return 15 * 60 * 1000;
     }
+  }
+
+  /**
+   * Update user profile
+   */
+  async updateProfile(
+    userId: string,
+    data: { firstName?: string; lastName?: string; username?: string }
+  ): Promise<{ user: any }> {
+    // Check if username is being changed and if it's already taken
+    if (data.username) {
+      const existingUser = await prisma.user.findFirst({
+        where: {
+          username: data.username,
+          NOT: { id: userId },
+        },
+      });
+
+      if (existingUser) {
+        throw new Error('Username is already taken');
+      }
+    }
+
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        username: data.username,
+      },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        firstName: true,
+        lastName: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+        lastLogin: true,
+        roles: {
+          include: {
+            role: {
+              select: {
+                name: true,
+                permissions: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return { user };
+  }
+
+  /**
+   * Change user password
+   */
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string
+  ): Promise<void> {
+    // Get current user with password
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    // Verify current password
+    const isValidPassword = await bcrypt.compare(currentPassword, user.password);
+    if (!isValidPassword) {
+      throw new Error('Current password is incorrect');
+    }
+
+    // Validate new password strength
+    this.validatePassword(newPassword);
+
+    // Ensure new password is different
+    const isSamePassword = await bcrypt.compare(newPassword, user.password);
+    if (isSamePassword) {
+      throw new Error('New password must be different from current password');
+    }
+
+    // Hash and save new password
+    const hashedPassword = await bcrypt.hash(newPassword, SECURITY.BCRYPT_ROUNDS);
+    await prisma.user.update({
+      where: { id: userId },
+      data: { password: hashedPassword },
+    });
+
+    // Revoke all other sessions for security
+    await prisma.session.updateMany({
+      where: {
+        userId,
+        revokedAt: null,
+      },
+      data: { revokedAt: new Date() },
+    });
+  }
+
+  /**
+   * Get user profile with full details
+   */
+  async getProfile(userId: string): Promise<any> {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        firstName: true,
+        lastName: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+        lastLogin: true,
+        roles: {
+          include: {
+            role: {
+              select: {
+                name: true,
+                permissions: true,
+              },
+            },
+          },
+        },
+        sessions: {
+          where: {
+            revokedAt: null,
+            expiresAt: { gt: new Date() },
+          },
+          select: {
+            id: true,
+            userAgent: true,
+            ipAddress: true,
+            createdAt: true,
+            expiresAt: true,
+          },
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    return {
+      ...user,
+      roles: user.roles.map(ur => ur.role.name),
+      permissions: user.roles.flatMap(ur => ur.role.permissions as string[]),
+    };
+  }
+
+  /**
+   * Revoke a specific session
+   */
+  async revokeSession(userId: string, sessionId: string): Promise<void> {
+    const session = await prisma.session.findFirst({
+      where: {
+        id: sessionId,
+        userId,
+      },
+    });
+
+    if (!session) {
+      throw new Error('Session not found');
+    }
+
+    await prisma.session.update({
+      where: { id: sessionId },
+      data: { revokedAt: new Date() },
+    });
+  }
+
+  /**
+   * Revoke all sessions except current
+   */
+  async revokeOtherSessions(userId: string, currentRefreshToken: string): Promise<number> {
+    const result = await prisma.session.updateMany({
+      where: {
+        userId,
+        refreshToken: { not: currentRefreshToken },
+        revokedAt: null,
+      },
+      data: { revokedAt: new Date() },
+    });
+
+    return result.count;
   }
 }

@@ -13,13 +13,14 @@ import path from 'path';
 
 export class ModuleLifecycleService {
   private static MODULES_DIR = path.join(process.cwd(), 'modules');
-  private static app: FastifyInstance;
+  // Note: FastifyInstance could be stored here if needed for future use
 
   /**
    * Initialize the lifecycle service with the Fastify app instance
    */
-  static setApp(app: FastifyInstance): void {
-    this.app = app;
+  static setApp(_app: FastifyInstance): void {
+    // App instance stored for future use (currently unused)
+    // this.app = app;
   }
 
   /**
@@ -111,11 +112,23 @@ export class ModuleLifecycleService {
         return { success: false, error: 'Module is already enabled' };
       }
 
+      // Auto-install modules that are in REGISTERED state (for built-in modules)
       if (module.status === ModuleStatus.REGISTERED) {
-        return {
-          success: false,
-          error: 'Module must be installed before enabling. Use install endpoint first.',
-        };
+        const installResult = await this.install(moduleName);
+        if (!installResult.success) {
+          return {
+            success: false,
+            error: `Failed to auto-install module: ${installResult.error}`,
+          };
+        }
+        // Re-fetch module after installation
+        const updatedModule = await ModuleRegistryService.getByName(moduleName);
+        if (!updatedModule || updatedModule.status !== ModuleStatus.DISABLED) {
+          return {
+            success: false,
+            error: 'Module installation did not complete properly',
+          };
+        }
       }
 
       // Check dependencies are enabled

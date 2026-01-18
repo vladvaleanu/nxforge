@@ -3,7 +3,7 @@
  * Handles module registration, storage, and retrieval
  */
 
-import { prisma, Prisma } from '../lib/prisma';
+import { prisma, Prisma, $Enums } from '../lib/prisma';
 import {
   ModuleManifest,
   ModuleRegistryEntry,
@@ -58,10 +58,10 @@ export class ModuleRegistryService {
             displayName: manifest.displayName,
             description: manifest.description,
             author: manifest.author,
-            manifest: manifest as any,
-            config: options?.config as any,
+            manifest: manifest as unknown as Prisma.InputJsonValue,
+            config: (options?.config ?? null) as Prisma.InputJsonValue,
             path: options?.path,
-            status: ModuleStatus.REGISTERED,
+            status: $Enums.ModuleStatus.REGISTERED,
           },
         });
 
@@ -80,10 +80,10 @@ export class ModuleRegistryService {
             displayName: manifest.displayName,
             description: manifest.description,
             author: manifest.author,
-            manifest: manifest as any,
-            config: options?.config as any,
+            manifest: manifest as unknown as Prisma.InputJsonValue,
+            config: (options?.config ?? null) as Prisma.InputJsonValue,
             path: options?.path,
-            status: ModuleStatus.REGISTERED,
+            status: $Enums.ModuleStatus.REGISTERED,
           },
         });
 
@@ -155,8 +155,9 @@ export class ModuleRegistryService {
       version: module.version,
       displayName: module.displayName,
       description: module.description,
+      author: (module.manifest as unknown as ModuleManifest)?.author || 'Unknown',
       status: module.status as ModuleStatus,
-      manifest: module.manifest as ModuleManifest,
+      manifest: module.manifest as unknown as ModuleManifest,
       installedAt: module.installedAt,
       enabledAt: module.enabledAt,
       disabledAt: module.disabledAt,
@@ -183,8 +184,9 @@ export class ModuleRegistryService {
       version: module.version,
       displayName: module.displayName,
       description: module.description,
+      author: (module.manifest as unknown as ModuleManifest)?.author || 'Unknown',
       status: module.status as ModuleStatus,
-      manifest: module.manifest as ModuleManifest,
+      manifest: module.manifest as unknown as ModuleManifest,
       installedAt: module.installedAt,
       enabledAt: module.enabledAt,
       disabledAt: module.disabledAt,
@@ -203,7 +205,8 @@ export class ModuleRegistryService {
     const where: Prisma.ModuleWhereInput = {};
 
     if (filters?.status) {
-      where.status = filters.status;
+      // Convert TypeScript enum to Prisma enum
+      where.status = filters.status as unknown as $Enums.ModuleStatus;
     }
 
     if (filters?.search) {
@@ -225,8 +228,9 @@ export class ModuleRegistryService {
       version: module.version,
       displayName: module.displayName,
       description: module.description,
+      author: (module.manifest as unknown as ModuleManifest)?.author || 'Unknown',
       status: module.status as ModuleStatus,
-      manifest: module.manifest as ModuleManifest,
+      manifest: module.manifest as unknown as ModuleManifest,
       installedAt: module.installedAt,
       enabledAt: module.enabledAt,
       disabledAt: module.disabledAt,
@@ -243,7 +247,10 @@ export class ModuleRegistryService {
     status: ModuleStatus
   ): Promise<{ success: boolean; error?: string }> {
     try {
-      const data: Prisma.ModuleUpdateInput = { status };
+      // Convert TypeScript enum to Prisma enum
+      const data: Prisma.ModuleUpdateInput = {
+        status: status as unknown as $Enums.ModuleStatus,
+      };
 
       // Set timestamp based on status
       if (status === ModuleStatus.ENABLED) {
@@ -321,7 +328,7 @@ export class ModuleRegistryService {
 
       await prisma.module.update({
         where: { name },
-        data: { config: config as any },
+        data: { config: config as Prisma.InputJsonValue },
       });
 
       return { success: true };

@@ -4,7 +4,8 @@
  */
 
 import type { FastifyInstance } from 'fastify';
-import type { ModuleContext } from '@nxforge/core';
+import { ModuleContext } from '../types/index.js';
+import { scrape, type AuthConfig, type ScrapingConfig } from '../lib/scraper.js';
 
 interface ReadingsQuery {
   endpointId?: string;
@@ -31,7 +32,7 @@ interface SummaryQuery {
  * Register consumption monitoring routes
  */
 export async function registerRoutes(fastify: FastifyInstance, context: ModuleContext) {
-  const { prisma, logger } = context.services;
+  const { prisma, logger, browser } = context.services;
 
   // GET /readings - Query consumption readings
   fastify.get<{ Querystring: ReadingsQuery }>('/readings', async (request) => {
@@ -373,12 +374,12 @@ export async function registerRoutes(fastify: FastifyInstance, context: ModuleCo
         enabled: endpoint.enabled,
         lastReading: latestReading
           ? {
-              timestamp: latestReading.timestamp,
-              totalKwh: latestReading.totalKwh || 0,
-              voltage: latestReading.voltage,
-              current: latestReading.current,
-              power: latestReading.power,
-            }
+            timestamp: latestReading.timestamp,
+            totalKwh: latestReading.totalKwh || 0,
+            voltage: latestReading.voltage,
+            current: latestReading.current,
+            power: latestReading.power,
+          }
           : undefined,
         status: latestReading?.success ? 'online' : latestReading ? 'error' : 'offline',
       };
@@ -602,15 +603,15 @@ export async function registerRoutes(fastify: FastifyInstance, context: ModuleCo
     }
 
     try {
-      // Import ScrapingService dynamically
-      const { ScrapingService } = await import('@nxforge/core');
-
-      // Perform actual scraping test
-      const result = await ScrapingService.scrape(
+      // Use the core browserService via the scraper utility
+      const result = await scrape(
+        browser,
         `http://${endpoint.ipAddress}`,
-        endpoint.authConfig,
-        endpoint.scrapingConfig,
-        { screenshotOnError: true }
+        endpoint.authType as 'none' | 'basic' | 'form',
+        endpoint.authConfig as AuthConfig | null,
+        endpoint.scrapingConfig as ScrapingConfig | null,
+        { screenshotOnError: true },
+        logger
       );
 
       if (!result.success) {

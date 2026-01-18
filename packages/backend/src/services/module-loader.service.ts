@@ -6,13 +6,13 @@
 import { FastifyInstance, FastifyPluginCallback } from 'fastify';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { ModuleValidatorService } from '@nxforge/core/services';
-import type { ModuleManifest } from '@nxforge/core/types';
-import { prisma, PrismaClient, Prisma } from '../lib/prisma.js';
-import { logger, Logger } from '../config/logger.js';
+import { ModuleValidator } from './module-validator.service.js';
+import type { ModuleManifest, ModuleContext } from '../types/module.types.js';
+import { prisma, Prisma } from '../lib/prisma.js';
+import { logger } from '../config/logger.js';
 import { MigrationRunnerService } from './migration-runner.service.js';
 import { jobExecutorService } from './job-executor.service.js';
-import type { ModuleContext } from '../types/module.types.js';
+import { eventBusService } from './event-bus.service.js';
 
 // ============================================================================
 // Types
@@ -87,11 +87,29 @@ export class ModuleLoaderService {
         moduleRecord.config as Record<string, unknown> | undefined
       );
 
-      // Load module plugin
+      // Load and register module plugin or routes
       const plugin = await this.loadModulePlugin(moduleName, manifest, moduleDir);
+      let registeredRoutes: string[] = [];
 
-      // Register routes
-      const registeredRoutes = await this.registerRoutes(moduleName, manifest, moduleDir, moduleContext);
+      if (plugin && typeof plugin === 'function') {
+        // Plugin-based approach (recommended)
+        const prefix = `/api/v1/m/${moduleName}`;
+        await this.app.register(plugin, { prefix });
+        logger.info(`Registered module plugin: ${moduleName} at ${prefix}`);
+        registeredRoutes = [`Plugin registered at ${prefix}`];
+      } else if (manifest.routes && manifest.routes.length > 0) {
+        // Fallback to manifest-based routes (legacy support)
+        logger.warn(
+          `Module ${moduleName} using legacy manifest-based routes. ` +
+          `Consider migrating to plugin-based approach (see docs/MODULE_DEVELOPMENT.md)`
+        );
+        registeredRoutes = await this.registerRoutes(moduleName, manifest, moduleDir, moduleContext);
+      } else {
+        throw new Error(
+          `Module ${moduleName} has no routes or plugin. ` +
+          `Entry point should export a Fastify plugin or manifest should define routes.`
+        );
+      }
 
       // Register jobs
       const registeredJobs = await this.registerJobs(moduleName, manifest, moduleRecord.id);
@@ -116,6 +134,15 @@ export class ModuleLoaderService {
       logger.info(`Module loaded successfully: ${moduleName}`, {
         routes: registeredRoutes.length,
         jobs: registeredJobs.length,
+      });
+
+      // Emit module loaded event
+      await eventBusService.emit('module.loaded', {
+        moduleName,
+        version: manifest.version,
+        routes: registeredRoutes.length,
+        jobs: registeredJobs.length,
+        source: 'system',
       });
     } catch (error) {
       logger.error(`Failed to load module ${moduleName}:`, error);
@@ -193,6 +220,12 @@ export class ModuleLoaderService {
       });
 
       logger.info(`Module unloaded successfully: ${moduleName}`);
+
+      // Emit module unloaded event
+      await eventBusService.emit('module.unloaded', {
+        moduleName,
+        source: 'system',
+      });
     } catch (error) {
       logger.error(`Failed to unload module ${moduleName}:`, error);
       throw error;
@@ -287,14 +320,16 @@ export class ModuleLoaderService {
    * Validate module manifest
    */
   private static async validateManifest(manifest: ModuleManifest): Promise<void> {
-    const result = ModuleValidatorService.validate(manifest);
+    const result = ModuleValidator.validate(manifest);
 
     if (!result.valid) {
-      const errorMessage = `Manifest validation failed:\n${result.errors.join('\n')}`;
-      throw new Error(errorMessage);
+      const errorMessages = result.errors.map(e =>
+        typeof e === 'string' ? e : `${e.field}: ${e.message}`
+      );
+      throw new Error(`Manifest validation failed:\n${errorMessages.join('\n')}`);
     }
 
-    if (result.warnings.length > 0) {
+    if (result.warnings && result.warnings.length > 0) {
       logger.warn(`Manifest validation warnings for ${manifest.name}:`, result.warnings);
     }
   }
@@ -329,9 +364,15 @@ export class ModuleLoaderService {
     // Validate manifest.entry to prevent path traversal
     this.validatePath(moduleDir, manifest.entry);
 
-    const pluginPath = path.join(moduleDir, manifest.entry);
+    let pluginPath = path.join(moduleDir, manifest.entry);
 
     try {
+      // For TypeScript files in development, convert .ts to use file:// URL
+      // tsx (which runs the backend in dev mode) can handle this
+      if (pluginPath.endsWith('.ts')) {
+        pluginPath = `file://${pluginPath}`;
+      }
+
       // Dynamic import of the module
       const plugin = await import(pluginPath);
       return plugin.default || plugin;
@@ -364,7 +405,12 @@ export class ModuleLoaderService {
           this.validatePath(moduleDir, route.handler);
         }
 
-        const handlerPath = path.join(moduleDir, route.handler || '');
+        let handlerPath = path.join(moduleDir, route.handler || '');
+
+        // For TypeScript files in development, convert .ts to use file:// URL
+        if (handlerPath.endsWith('.ts')) {
+          handlerPath = `file://${handlerPath}`;
+        }
 
         // Import route handler
         const handler = await import(handlerPath);
@@ -402,6 +448,11 @@ export class ModuleLoaderService {
   ): Promise<string[]> {
     const registeredJobs: string[] = [];
 
+    // Skip if no jobs defined
+    if (!manifest.jobs) {
+      return registeredJobs;
+    }
+
     for (const [jobName, jobDef] of Object.entries(manifest.jobs)) {
       try {
         // Check if job already exists
@@ -422,7 +473,7 @@ export class ModuleLoaderService {
               schedule: jobDef.schedule,
               timeout: jobDef.timeout || 300000,
               retries: jobDef.retries || 3,
-              config: (jobDef.config as Prisma.JsonValue) || Prisma.JsonNull,
+              config: (jobDef.config as unknown as Prisma.JsonValue) || Prisma.JsonNull,
               enabled: true,
             },
           });
@@ -437,7 +488,7 @@ export class ModuleLoaderService {
               schedule: jobDef.schedule,
               timeout: jobDef.timeout || 300000,
               retries: jobDef.retries || 3,
-              config: (jobDef.config as Prisma.JsonValue) || Prisma.JsonNull,
+              config: (jobDef.config as unknown as Prisma.JsonValue) || Prisma.JsonNull,
               enabled: true,
             },
           });

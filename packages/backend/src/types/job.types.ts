@@ -79,6 +79,7 @@ export interface JobContext {
 
   // Core shared services
   services: {
+    prisma: any; // Prisma client for direct database access
     browser: BrowserService;
     notifications: NotificationService;
     http: HttpService;
@@ -210,7 +211,8 @@ export interface CreateJobDTO {
 export interface UpdateJobDTO {
   name?: string;
   description?: string;
-  schedule?: string;
+  handler?: string;
+  schedule?: string | null; // null to remove schedule
   enabled?: boolean;
   timeout?: number;
   retries?: number;

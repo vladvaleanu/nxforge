@@ -2,11 +2,15 @@
  * Prisma client singleton
  */
 
-import { PrismaClient, Prisma } from '@prisma/client';
+import { PrismaClient, Prisma, $Enums } from '@prisma/client';
 import { logger } from '../config/logger';
 
-// Re-export Prisma namespace for types
-export { PrismaClient, Prisma };
+// Re-export Prisma namespace and enums for types
+export { PrismaClient, Prisma, $Enums };
+
+// Re-export specific enums for convenience
+export type PrismaModuleStatus = $Enums.ModuleStatus;
+export type PrismaJobExecutionStatus = $Enums.JobExecutionStatus;
 
 const prismaClientSingleton = () => {
   return new PrismaClient({

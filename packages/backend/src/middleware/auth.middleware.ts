@@ -6,9 +6,10 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { TokenPayload } from '../services/auth.service';
 
-declare module 'fastify' {
-  interface FastifyRequest {
-    user?: TokenPayload;
+// Extend fastify-jwt module to include our custom user type
+declare module '@fastify/jwt' {
+  interface FastifyJWT {
+    user: TokenPayload;
   }
 }
 
