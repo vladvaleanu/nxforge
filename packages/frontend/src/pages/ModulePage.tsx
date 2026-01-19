@@ -5,7 +5,7 @@ import DynamicWidget from '../components/dashboard/DynamicWidget';
 // A registry of module main pages if they exist
 // Similar to widget registry, but for full pages
 const MODULE_PAGE_REGISTRY: Record<string, React.LazyExoticComponent<any>> = {
-    'documentation-manager': React.lazy(() => import('../modules/documentation-manager/pages/DocumentationPage')),
+    'knowledge-base': React.lazy(() => import('../modules/documentation-manager/pages/DocumentationPage')),
     'ai-copilot': React.lazy(() => import('../modules/ai-copilot/pages/ForgePage')),
 };
 

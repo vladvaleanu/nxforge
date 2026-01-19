@@ -22,7 +22,7 @@
       "items": [
         {
           "label": "Knowledge Base",
-          "path": "/modules/documentation-manager"
+          "path": "/modules/knowledge-base"
         }
       ]
     }
@@ -30,7 +30,7 @@
   "ui": {
     "entry": "frontend/pages/DocumentationPage.tsx",
     "sidebar": {
-      "label": "Documentation",
+      "label": "Knowledge Base",
       "icon": "BookOpen",
       "order": 10,
       "children": [
