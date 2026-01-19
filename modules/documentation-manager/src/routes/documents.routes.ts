@@ -584,8 +584,8 @@ export async function documentsRoutes(app: FastifyInstance, context: ModuleConte
         });
       }
 
-      const result = await context.services.prisma.$queryRawUnsafe<{ ai_accessible: boolean; has_embedding: boolean }[]>(
-        `SELECT ai_accessible, (embedding IS NOT NULL) as has_embedding FROM documents WHERE id = $1::uuid`,
+      const result = await context.services.prisma.$queryRawUnsafe<{ ai_accessible: boolean; ai_private: boolean; has_embedding: boolean }[]>(
+        `SELECT ai_accessible, ai_private, (embedding IS NOT NULL) as has_embedding FROM documents WHERE id = $1::uuid`,
         id
       );
 
@@ -601,6 +601,7 @@ export async function documentsRoutes(app: FastifyInstance, context: ModuleConte
         data: {
           id,
           aiAccessible: result[0].ai_accessible,
+          aiPrivate: result[0].ai_private,
           hasEmbedding: result[0].has_embedding,
         },
       });
@@ -613,6 +614,61 @@ export async function documentsRoutes(app: FastifyInstance, context: ModuleConte
     }
   });
 
+  /**
+   * PUT /documents/:id/ai-private - Toggle whether document is private (hidden from Forge)
+   */
+  app.put('/:id/ai-private', async (request, reply) => {
+    try {
+      const userId = getUserId(request);
+      const { id } = request.params as { id: string };
+      const { aiPrivate } = request.body as { aiPrivate: boolean };
+
+      // Check admin permission (only admins can toggle privacy)
+      const hasPermission = await permissionService.hasDocumentPermission(
+        userId,
+        id,
+        'ADMIN'
+      );
+
+      if (!hasPermission) {
+        return reply.status(403).send({
+          success: false,
+          error: { message: 'Admin permission required to modify AI privacy', statusCode: 403 },
+        });
+      }
+
+      // Update ai_private flag
+      // If making private, also disable ai_accessible and clear embedding
+      if (aiPrivate) {
+        await context.services.prisma.$executeRawUnsafe(
+          `UPDATE documents SET ai_private = TRUE, ai_accessible = FALSE, embedding = NULL, updated_at = NOW() WHERE id = $1::uuid`,
+          id
+        );
+      } else {
+        await context.services.prisma.$executeRawUnsafe(
+          `UPDATE documents SET ai_private = FALSE, updated_at = NOW() WHERE id = $1::uuid`,
+          id
+        );
+      }
+
+      reply.send({
+        success: true,
+        data: {
+          id,
+          aiPrivate,
+          message: aiPrivate
+            ? 'Document is now private and hidden from Forge AI'
+            : 'Document is now visible to Forge AI'
+        },
+      });
+    } catch (err) {
+      const error = err as Error;
+      reply.status(400).send({
+        success: false,
+        error: { message: error.message, statusCode: 400 },
+      });
+    }
+  });
 
 }
 

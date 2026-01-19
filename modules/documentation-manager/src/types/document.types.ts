@@ -19,6 +19,7 @@ export interface DocumentRow {
     author_id: string;
     status: DocumentStatus;
     ai_accessible: boolean;
+    ai_private: boolean;
     created_at: Date;
     updated_at: Date;
     published_at: Date | null;

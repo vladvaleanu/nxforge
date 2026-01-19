@@ -429,6 +429,7 @@ model Document {
 
   // AI Integration
   ai_accessible Boolean                    @default(false) @map("ai_accessible")
+  ai_private    Boolean                    @default(false) @map("ai_private")
   embedding     Unsupported("vector(768)")?
 
   // Trash & Retention

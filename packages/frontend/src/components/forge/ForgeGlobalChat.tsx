@@ -282,8 +282,8 @@ export function ForgeGlobalChat() {
                 <SparklesIcon className="h-6 w-6" />
                 {/* Status indicator */}
                 <span className={`absolute top-0 right-0 w-3 h-3 rounded-full border-2 border-white dark:border-gray-900 ${connectionStatus === 'connected' ? 'bg-green-500' :
-                        connectionStatus === 'reconnecting' ? 'bg-yellow-500 animate-pulse' :
-                            'bg-red-500'
+                    connectionStatus === 'reconnecting' ? 'bg-yellow-500 animate-pulse' :
+                        'bg-red-500'
                     }`} />
             </button>
         );
@@ -299,20 +299,20 @@ export function ForgeGlobalChat() {
 
     return (
         <div
-            className={`fixed bottom-6 right-6 z-50 ${panelClass} flex flex-col bg-gray-900 rounded-2xl shadow-2xl border border-gray-800 overflow-hidden transition-all duration-200`}
+            className={`fixed bottom-6 right-6 z-50 ${panelClass} flex flex-col bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800 overflow-hidden transition-all duration-200`}
         >
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-purple-600/20 to-blue-600/20 border-b border-gray-800">
+            <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-purple-100 to-blue-100 dark:from-purple-600/20 dark:to-blue-600/20 border-b border-gray-200 dark:border-gray-800">
                 <div className="flex items-center gap-2">
                     <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center">
                         <SparklesIcon className="h-4 w-4 text-white" />
                     </div>
                     <div className="flex flex-col">
                         <div className="flex items-center gap-2">
-                            <span className="font-semibold text-white text-sm">Forge</span>
+                            <span className="font-semibold text-gray-900 dark:text-white text-sm">Forge</span>
                             <span className={`text-xs ${connectionStatus === 'connected' ? 'text-green-400' :
-                                    connectionStatus === 'reconnecting' ? 'text-yellow-400' :
-                                        'text-red-400'
+                                connectionStatus === 'reconnecting' ? 'text-yellow-400' :
+                                    'text-red-400'
                                 }`}>●</span>
                         </div>
                         <span className={`text-xs ${pageContext.color}`}>
@@ -323,14 +323,14 @@ export function ForgeGlobalChat() {
                 <div className="flex items-center gap-1">
                     <Link
                         to="/modules/ai-copilot/settings"
-                        className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+                        className="p-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
                         title="Settings"
                     >
                         <Cog6ToothIcon className="h-4 w-4" />
                     </Link>
                     <button
                         onClick={toggleExpanded}
-                        className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+                        className="p-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
                         title={isExpanded ? 'Shrink' : 'Expand'}
                     >
                         {isExpanded ? (
@@ -341,7 +341,7 @@ export function ForgeGlobalChat() {
                     </button>
                     <button
                         onClick={toggleOpen}
-                        className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+                        className="p-1.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
                         title="Close"
                     >
                         <XMarkIcon className="h-4 w-4" />
@@ -351,8 +351,8 @@ export function ForgeGlobalChat() {
 
             {/* Connection Warning Banner */}
             {connectionStatus !== 'connected' && (
-                <div className="flex items-center justify-between px-4 py-2 bg-yellow-900/50 border-b border-yellow-800/50">
-                    <div className="flex items-center gap-2 text-yellow-300 text-xs">
+                <div className="flex items-center justify-between px-4 py-2 bg-yellow-100 dark:bg-yellow-900/50 border-b border-yellow-200 dark:border-yellow-800/50">
+                    <div className="flex items-center gap-2 text-yellow-800 dark:text-yellow-300 text-xs">
                         <ExclamationTriangleIcon className="h-4 w-4" />
                         <span>
                             {connectionStatus === 'reconnecting' ? 'Reconnecting to Ollama...' : 'Ollama disconnected'}
@@ -360,7 +360,7 @@ export function ForgeGlobalChat() {
                     </div>
                     <button
                         onClick={handleRetryConnection}
-                        className="text-xs text-yellow-400 hover:text-yellow-200 transition-colors"
+                        className="text-xs text-yellow-700 dark:text-yellow-400 hover:text-yellow-900 dark:hover:text-yellow-200 transition-colors"
                     >
                         Retry
                     </button>
@@ -368,15 +368,15 @@ export function ForgeGlobalChat() {
             )}
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50 dark:bg-gray-900">
                 {messages.map((message) => (
                     <MessageBubble key={message.id} message={message} />
                 ))}
                 {isTyping && (
                     <div className="flex justify-start">
-                        <div className="max-w-[85%] rounded-2xl px-3 py-2 text-sm bg-gray-800 text-gray-100 rounded-bl-sm">
+                        <div className="max-w-[85%] rounded-2xl px-3 py-2 text-sm bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-bl-sm">
                             {streamingContent || (
-                                <div className="flex items-center gap-2 text-gray-400">
+                                <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
                                     <div className="flex gap-1">
                                         <span className="w-2 h-2 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '0ms' }} />
                                         <span className="w-2 h-2 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -392,7 +392,7 @@ export function ForgeGlobalChat() {
             </div>
 
             {/* Input */}
-            <div className="flex-shrink-0 p-3 bg-gray-800/50 border-t border-gray-800">
+            <div className="flex-shrink-0 p-3 bg-gray-100 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-800">
                 <div className="flex items-center gap-2">
                     <input
                         ref={inputRef}
@@ -402,7 +402,7 @@ export function ForgeGlobalChat() {
                         onKeyDown={handleKeyDown}
                         placeholder="Ask Forge..."
                         disabled={isTyping}
-                        className="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50"
+                        className="flex-1 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white text-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50"
                     />
                     <button
                         onClick={handleSend}
@@ -412,11 +412,11 @@ export function ForgeGlobalChat() {
                         <PaperAirplaneIcon className="h-4 w-4" />
                     </button>
                 </div>
-                <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
-                    <button onClick={handleClear} className="hover:text-gray-300 transition-colors">
+                <div className="flex items-center justify-between mt-2 text-xs text-gray-500 dark:text-gray-500">
+                    <button onClick={handleClear} className="hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
                         Clear chat
                     </button>
-                    <Link to="/modules/ai-copilot/chat" className="hover:text-purple-400 transition-colors flex items-center gap-1">
+                    <Link to="/modules/ai-copilot/chat" className="hover:text-purple-600 dark:hover:text-purple-400 transition-colors flex items-center gap-1">
                         <ChatBubbleLeftRightIcon className="h-3 w-3" />
                         Open full view
                     </Link>
@@ -433,7 +433,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
 
     if (isSystem) {
         return (
-            <div className="text-center text-xs text-gray-500 py-2">
+            <div className="text-center text-xs text-gray-500 dark:text-gray-500 py-2">
                 {message.content}
             </div>
         );
@@ -444,7 +444,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
             <div
                 className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap ${isUser
                     ? 'bg-purple-600 text-white rounded-br-sm'
-                    : 'bg-gray-800 text-gray-100 rounded-bl-sm'
+                    : 'bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-bl-sm'
                     }`}
             >
                 {message.content}

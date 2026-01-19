@@ -16,7 +16,7 @@ import {
 import { documentsApi, categoriesApi, foldersApi, type Document, type CreateDocumentData, type UpdateDocumentData } from '../api/docs.api';
 import { RichTextEditor } from './RichTextEditor';
 import { DocumentHistory } from './DocumentHistory';
-import { showError } from '../../../utils/toast.utils';
+import { showError, showSuccess } from '../../../utils/toast.utils';
 
 interface DocumentEditorProps {
   documentId?: string;
@@ -39,6 +39,7 @@ export function DocumentEditor({ documentId, onClose, onSave }: DocumentEditorPr
   const [showPreview, setShowPreview] = useState(false);
   const [editorMode, setEditorMode] = useState<'markdown' | 'wysiwyg'>('wysiwyg');
   const [aiAccessible, setAiAccessible] = useState(false);
+  const [aiPrivate, setAiPrivate] = useState(false);
   const [hasEmbedding, setHasEmbedding] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [isDirty, setIsDirty] = useState(!isEditMode); // New docs start dirty, edits start clean
@@ -88,12 +89,25 @@ export function DocumentEditor({ documentId, onClose, onSave }: DocumentEditorPr
     refetchInterval: aiAccessible && !hasEmbedding ? 2000 : false,
   });
 
-  // AI access toggle mutation
+  // AI access toggle mutation (silent - notifications handled by visibility handlers)
   const aiAccessMutation = useMutation({
     mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
       documentsApi.setAiAccess(id, enabled),
     onSuccess: (response) => {
       setAiAccessible(response.data.aiAccessible);
+      queryClient.invalidateQueries({ queryKey: ['docs-ai-access', documentId] });
+    },
+  });
+
+  // AI privacy toggle mutation (silent - notifications handled by visibility handlers)
+  const aiPrivateMutation = useMutation({
+    mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
+      documentsApi.setAiPrivate(id, enabled),
+    onSuccess: (response) => {
+      setAiPrivate(response.data.aiPrivate);
+      if (response.data.aiPrivate) {
+        setAiAccessible(false); // Private docs can't be accessible
+      }
       queryClient.invalidateQueries({ queryKey: ['docs-ai-access', documentId] });
     },
   });
@@ -127,13 +141,46 @@ export function DocumentEditor({ documentId, onClose, onSave }: DocumentEditorPr
   useEffect(() => {
     if (aiAccessResponse?.data) {
       setAiAccessible(aiAccessResponse.data.aiAccessible);
+      setAiPrivate(aiAccessResponse.data.aiPrivate);
       setHasEmbedding(aiAccessResponse.data.hasEmbedding);
     }
   }, [aiAccessResponse]);
 
-  const handleAiAccessToggle = () => {
-    if (!documentId) return;
-    aiAccessMutation.mutate({ id: documentId, enabled: !aiAccessible });
+  // Unified visibility change handlers
+  const setVisibilityPrivate = async () => {
+    if (!documentId || aiPrivate) return;
+    const wasAccessible = aiAccessible;
+    await aiPrivateMutation.mutateAsync({ id: documentId, enabled: true });
+    showSuccess(wasAccessible
+      ? 'Document removed from Forge AI training and hidden'
+      : 'Document is now hidden from Forge AI');
+  };
+
+  const setVisibilityVisible = async () => {
+    if (!documentId || (!aiPrivate && !aiAccessible)) return;
+    const wasPrivate = aiPrivate;
+    const wasAccessible = aiAccessible;
+
+    if (wasPrivate) {
+      await aiPrivateMutation.mutateAsync({ id: documentId, enabled: false });
+    }
+    if (wasAccessible) {
+      await aiAccessMutation.mutateAsync({ id: documentId, enabled: false });
+      showSuccess('Document removed from Forge AI training');
+    } else if (wasPrivate) {
+      showSuccess('Document is now visible to Forge AI');
+    }
+  };
+
+  const setVisibilityTrained = async () => {
+    if (!documentId || (!aiPrivate && aiAccessible)) return;
+    const wasPrivate = aiPrivate;
+
+    if (wasPrivate) {
+      await aiPrivateMutation.mutateAsync({ id: documentId, enabled: false });
+    }
+    await aiAccessMutation.mutateAsync({ id: documentId, enabled: true });
+    showSuccess('Document queued for Forge AI training');
   };
 
   // Create mutation
@@ -206,11 +253,13 @@ export function DocumentEditor({ documentId, onClose, onSave }: DocumentEditorPr
     if (tagInput.trim() && !tags.includes(tagInput.trim())) {
       setTags([...tags, tagInput.trim()]);
       setTagInput('');
+      markDirty();
     }
   };
 
   const handleRemoveTag = (tag: string) => {
     setTags(tags.filter(t => t !== tag));
+    markDirty();
   };
 
   const renderPreview = () => {
@@ -426,43 +475,100 @@ export function DocumentEditor({ documentId, onClose, onSave }: DocumentEditorPr
               </div>
             </div>
 
-            {/* Forge AI Access (edit mode only) */}
+            {/* Forge AI Visibility (edit mode only) */}
             {isEditMode && status === 'PUBLISHED' && (
               <div className="border border-purple-200 dark:border-purple-800 rounded-lg p-4 bg-purple-50 dark:bg-purple-900/20">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <SparklesIcon className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                <div className="flex items-start gap-3 mb-4">
+                  <SparklesIcon className="h-5 w-5 text-purple-600 dark:text-purple-400 mt-0.5" />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Forge AI Visibility
+                    </label>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Control how Forge AI interacts with this document
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-3 pl-8">
+                  {/* Private Option */}
+                  <label className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${aiPrivate
+                    ? 'bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700'
+                    : 'hover:bg-gray-100 dark:hover:bg-gray-800/50'
+                    } ${aiPrivateMutation.isPending ? 'opacity-50 cursor-wait' : ''}`}>
+                    <input
+                      type="radio"
+                      name="ai-visibility"
+                      checked={aiPrivate}
+                      onChange={() => setVisibilityPrivate()}
+                      disabled={aiPrivateMutation.isPending || aiAccessMutation.isPending}
+                      className="text-red-600"
+                    />
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Forge AI Access
-                      </label>
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        🔒 Private
+                      </span>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Allow Forge to read this document for context-aware responses
+                        Hidden from Forge completely
                       </p>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {aiAccessible && (
-                      <span className={`text-xs px-2 py-1 rounded-full ${hasEmbedding
-                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                        : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                        }`}>
-                        {hasEmbedding ? 'Indexed' : 'Indexing...'}
+                  </label>
+
+                  {/* Visible Option */}
+                  <label className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${!aiPrivate && !aiAccessible
+                    ? 'bg-blue-100 dark:bg-blue-900/30 border border-blue-300 dark:border-blue-700'
+                    : 'hover:bg-gray-100 dark:hover:bg-gray-800/50'
+                    } ${aiPrivateMutation.isPending || aiAccessMutation.isPending ? 'opacity-50 cursor-wait' : ''}`}>
+                    <input
+                      type="radio"
+                      name="ai-visibility"
+                      checked={!aiPrivate && !aiAccessible}
+                      onChange={() => setVisibilityVisible()}
+                      disabled={aiPrivateMutation.isPending || aiAccessMutation.isPending}
+                      className="text-blue-600"
+                    />
+                    <div>
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        👁️ Visible
                       </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={handleAiAccessToggle}
-                      disabled={aiAccessMutation.isPending}
-                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${aiAccessible ? 'bg-purple-600' : 'bg-gray-200 dark:bg-gray-700'
-                        } ${aiAccessMutation.isPending ? 'opacity-50 cursor-wait' : ''}`}
-                    >
-                      <span
-                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${aiAccessible ? 'translate-x-5' : 'translate-x-0'
-                          }`}
-                      />
-                    </button>
-                  </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Forge can see for context, but not trained
+                      </p>
+                    </div>
+                  </label>
+
+                  {/* Trained Option */}
+                  <label className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${!aiPrivate && aiAccessible
+                    ? 'bg-purple-100 dark:bg-purple-900/40 border border-purple-300 dark:border-purple-700'
+                    : 'hover:bg-gray-100 dark:hover:bg-gray-800/50'
+                    } ${aiPrivateMutation.isPending || aiAccessMutation.isPending ? 'opacity-50 cursor-wait' : ''}`}>
+                    <input
+                      type="radio"
+                      name="ai-visibility"
+                      checked={!aiPrivate && aiAccessible}
+                      onChange={() => setVisibilityTrained()}
+                      disabled={aiPrivateMutation.isPending || aiAccessMutation.isPending}
+                      className="text-purple-600"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          ✨ Trained
+                        </span>
+                        {aiAccessible && (
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${hasEmbedding
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                            : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                            }`}>
+                            {hasEmbedding ? 'Indexed' : 'Indexing...'}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        Embedded and used in RAG responses
+                      </p>
+                    </div>
+                  </label>
                 </div>
               </div>
             )}
@@ -515,7 +621,7 @@ export function DocumentEditor({ documentId, onClose, onSave }: DocumentEditorPr
                 <input
                   type="text"
                   value={changeNote}
-                  onChange={(e) => setChangeNote(e.target.value)}
+                  onChange={(e) => { setChangeNote(e.target.value); markDirty(); }}
                   placeholder="Describe your changes"
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />

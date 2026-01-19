@@ -298,7 +298,7 @@ export const documentsApi = {
    * Get AI accessibility status for a document
    */
   async getAiAccess(id: string) {
-    const response = await apiClient.get<{ id: string; aiAccessible: boolean; hasEmbedding: boolean }>(
+    const response = await apiClient.get<{ id: string; aiAccessible: boolean; aiPrivate: boolean; hasEmbedding: boolean }>(
       `/m/documentation-manager/documents/${id}/ai-access`
     );
     return response;
@@ -311,6 +311,17 @@ export const documentsApi = {
     const response = await apiClient.put<{ id: string; aiAccessible: boolean; message: string }>(
       `/m/documentation-manager/documents/${id}/ai-access`,
       { aiAccessible }
+    );
+    return response;
+  },
+
+  /**
+   * Toggle AI privacy for a document (hide from Forge completely)
+   */
+  async setAiPrivate(id: string, aiPrivate: boolean) {
+    const response = await apiClient.put<{ id: string; aiPrivate: boolean; message: string }>(
+      `/m/documentation-manager/documents/${id}/ai-private`,
+      { aiPrivate }
     );
     return response;
   },

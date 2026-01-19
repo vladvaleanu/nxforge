@@ -46,6 +46,7 @@ export class KnowledgeService {
 
     /**
      * Find documents relevant to a query using vector similarity
+     * Only searches trained documents (ai_private=FALSE AND ai_accessible=TRUE)
      */
     async findRelevant(query: string, limit?: number): Promise<KnowledgeDocument[]> {
         const k = limit || this.topK;
@@ -56,6 +57,11 @@ export class KnowledgeService {
             const vectorString = `[${queryEmbedding.join(',')}]`;
 
             // Vector similarity search using pgvector
+            // Only search documents that are:
+            // 1. Not private (ai_private = FALSE)
+            // 2. Accessible to AI (ai_accessible = TRUE)
+            // 3. Published
+            // 4. Have an embedding
             const results = await this.prisma.$queryRawUnsafe<KnowledgeDocument[]>(`
         SELECT 
           d.id,
@@ -66,7 +72,8 @@ export class KnowledgeService {
           1 - (d.embedding <=> $1::vector) as similarity
         FROM documents d
         LEFT JOIN document_categories c ON d.category_id = c.id
-        WHERE d.ai_accessible = TRUE 
+        WHERE d.ai_private = FALSE
+          AND d.ai_accessible = TRUE 
           AND d.status = 'PUBLISHED'
           AND d.embedding IS NOT NULL
         ORDER BY d.embedding <=> $1::vector
@@ -151,17 +158,23 @@ END OF DOCUMENTATION
 
     /**
      * Get stats about AI-accessible documents
+     * Returns counts for: visible (not private), trained (accessible + embedded)
      */
-    async getStats(): Promise<{ total: number; embedded: number }> {
-        const result = await this.prisma.$queryRawUnsafe<{ total: string; embedded: string }[]>(`
+    async getStats(): Promise<{ total: number; visible: number; trained: number; embedded: number }> {
+        const result = await this.prisma.$queryRawUnsafe<{ total: string; visible: string; trained: string; embedded: string }[]>(`
       SELECT 
-        COUNT(*) FILTER (WHERE ai_accessible = TRUE) as total,
-        COUNT(*) FILTER (WHERE ai_accessible = TRUE AND embedding IS NOT NULL) as embedded
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE ai_private = FALSE) as visible,
+        COUNT(*) FILTER (WHERE ai_private = FALSE AND ai_accessible = TRUE) as trained,
+        COUNT(*) FILTER (WHERE ai_private = FALSE AND ai_accessible = TRUE AND embedding IS NOT NULL) as embedded
       FROM documents
+      WHERE status = 'PUBLISHED'
     `);
 
         return {
             total: parseInt(result[0]?.total || '0', 10),
+            visible: parseInt(result[0]?.visible || '0', 10),
+            trained: parseInt(result[0]?.trained || '0', 10),
             embedded: parseInt(result[0]?.embedded || '0', 10),
         };
     }

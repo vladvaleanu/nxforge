@@ -94,13 +94,18 @@ class ApiClient {
                 refreshToken,
               });
 
-              const { accessToken, refreshToken: newRefreshToken } = response.data.data;
+              if (response.data.success) {
+                const { accessToken, refreshToken: newRefreshToken } = response.data.data;
 
-              tokenStorage.setAccessToken(accessToken);
-              tokenStorage.setRefreshToken(newRefreshToken);
+                tokenStorage.setAccessToken(accessToken);
+                tokenStorage.setRefreshToken(newRefreshToken);
 
-              originalRequest.headers.Authorization = `Bearer ${accessToken}`;
-              return this.client(originalRequest);
+                originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+                return this.client(originalRequest);
+              } else {
+                // Response was not successful, treat as refresh failure
+                throw new Error('Token refresh failed');
+              }
             } catch (refreshError) {
               // Refresh failed, clear tokens and redirect to login
               tokenStorage.clearTokens();
@@ -142,8 +147,8 @@ class ApiClient {
     return response.data;
   }
 
-  async delete<T>(url: string): Promise<ApiSuccessResponse<T>> {
-    const response = await this.client.delete<ApiSuccessResponse<T>>(url);
+  async delete<T>(url: string, data?: any): Promise<ApiSuccessResponse<T>> {
+    const response = await this.client.delete<ApiSuccessResponse<T>>(url, data ? { data } : undefined);
     return response.data;
   }
 
