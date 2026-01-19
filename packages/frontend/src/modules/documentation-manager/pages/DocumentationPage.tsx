@@ -41,6 +41,7 @@ export function DocumentationPage() {
 
   const handleSaveDocument = (document: Document) => {
     setSelectedDocument(document);
+    setEditingDocument(document); // Update editor to edit mode with new document
     // Don't close editor - it stays open after save
     // User closes with X button only
   };

@@ -136,7 +136,7 @@ export interface CreateDocumentData {
   title: string;
   content: string;
   categoryId: string;
-  folderId?: string;
+  folderId?: string | null;
   status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
   tags?: string[];
 }
@@ -145,7 +145,7 @@ export interface UpdateDocumentData {
   title?: string;
   content?: string;
   categoryId?: string;
-  folderId?: string;
+  folderId?: string | null;
   status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
   tags?: string[];
   changeNote?: string;

@@ -243,7 +243,11 @@ export class DocumentService {
   async deleteDocument(documentId: string) {
     await this.prisma.$executeRaw`
       UPDATE documents 
-      SET deleted_at = NOW() 
+      SET 
+        deleted_at = NOW(),
+        status = 'DRAFT'::document_status,
+        ai_accessible = FALSE,
+        embedding = NULL
       WHERE id = ${documentId}::uuid
     `;
   }

@@ -8,7 +8,6 @@ import { Link } from 'react-router-dom';
 import { ChatMessage } from '../types';
 import {
     SparklesIcon,
-    ArrowLeftIcon,
     PaperAirplaneIcon,
     Cog6ToothIcon,
     TrashIcon,
@@ -121,42 +120,41 @@ export function ChatPage() {
     };
 
     return (
-        <div className="h-full flex flex-col bg-gray-950">
+        <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-950">
             {/* Header */}
-            <header className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-gray-800 bg-gray-900/50">
-                <div className="flex items-center gap-4">
-                    <Link
-                        to="/incidents"
-                        className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
-                    >
-                        <ArrowLeftIcon className="h-5 w-5" />
-                        <span className="text-sm">Back to Incidents</span>
-                    </Link>
+            {/* Header */}
+            <header className="relative flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/50">
+                <div className="flex items-center gap-4 z-10">
+                    {/* Left side empty for now */}
                 </div>
 
-                <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center shadow-lg shadow-purple-500/20">
-                            <SparklesIcon className="h-5 w-5 text-white" />
-                        </div>
-                        <div>
-                            <h1 className="text-lg font-semibold text-white">Forge Chat</h1>
-                            <span className="text-xs text-green-400">● Online</span>
+                <div className="absolute left-1/2 lg:left-[calc(50%-8rem)] top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-3 transition-all duration-300">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center shadow-lg shadow-purple-500/20">
+                        <SparklesIcon className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                        <h1 className="text-lg font-semibold text-gray-900 dark:text-white leading-tight">Forge Chat</h1>
+                        <div className="flex items-center gap-1.5">
+                            <span className="relative flex h-2 w-2">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                            </span>
+                            <span className="text-xs font-medium text-green-600 dark:text-green-400">Online</span>
                         </div>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 z-10">
                     <button
                         onClick={handleClear}
-                        className="flex items-center gap-2 px-3 py-2 text-sm text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+                        className="flex items-center gap-2 px-3 py-2 text-sm text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
                     >
                         <TrashIcon className="h-4 w-4" />
                         Clear
                     </button>
                     <Link
                         to="/modules/ai-copilot/settings"
-                        className="flex items-center gap-2 px-3 py-2 text-sm text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+                        className="flex items-center gap-2 px-3 py-2 text-sm text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
                     >
                         <Cog6ToothIcon className="h-4 w-4" />
                         Settings
@@ -192,7 +190,7 @@ export function ChatPage() {
                     </div>
 
                     {/* Input */}
-                    <div className="flex-shrink-0 p-4 border-t border-gray-800 bg-gray-900/50">
+                    <div className="flex-shrink-0 p-4 border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900/50">
                         <div className="max-w-3xl mx-auto">
                             <div className="flex items-end gap-3">
                                 <textarea
@@ -202,7 +200,7 @@ export function ChatPage() {
                                     onKeyDown={handleKeyDown}
                                     placeholder="Ask Forge about infrastructure, incidents, or SOPs..."
                                     rows={1}
-                                    className="flex-1 px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                                    className="flex-1 px-4 py-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
                                     style={{ minHeight: '48px', maxHeight: '200px' }}
                                 />
                                 <button
@@ -221,45 +219,45 @@ export function ChatPage() {
                 </div>
 
                 {/* Quick Actions Sidebar */}
-                <div className="w-64 border-l border-gray-800 bg-gray-900/30 p-4 hidden lg:block">
-                    <h3 className="text-sm font-medium text-gray-400 mb-3">Quick Actions</h3>
+                <div className="w-64 border-l border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/30 p-4 hidden lg:block">
+                    <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">Quick Actions</h3>
                     <div className="space-y-2">
                         <button
                             onClick={() => setInput('Show me active incidents')}
-                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left text-gray-300 hover:bg-gray-800 rounded-lg transition-colors"
+                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
                         >
-                            <BoltIcon className="h-4 w-4 text-red-400" />
+                            <BoltIcon className="h-4 w-4 text-red-500 dark:text-red-400" />
                             Active incidents
                         </button>
                         <button
                             onClick={() => setInput('What SOPs are available?')}
-                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left text-gray-300 hover:bg-gray-800 rounded-lg transition-colors"
+                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
                         >
-                            <DocumentTextIcon className="h-4 w-4 text-blue-400" />
+                            <DocumentTextIcon className="h-4 w-4 text-blue-500 dark:text-blue-400" />
                             Available SOPs
                         </button>
                         <button
                             onClick={() => setInput('Show power status for all zones')}
-                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left text-gray-300 hover:bg-gray-800 rounded-lg transition-colors"
+                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
                         >
-                            <BoltIcon className="h-4 w-4 text-yellow-400" />
+                            <BoltIcon className="h-4 w-4 text-yellow-500 dark:text-yellow-400" />
                             Power status
                         </button>
                         <button
                             onClick={() => setInput('/help')}
-                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left text-gray-300 hover:bg-gray-800 rounded-lg transition-colors"
+                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
                         >
-                            <SparklesIcon className="h-4 w-4 text-purple-400" />
+                            <SparklesIcon className="h-4 w-4 text-purple-500 dark:text-purple-400" />
                             Help & commands
                         </button>
                     </div>
 
-                    <h3 className="text-sm font-medium text-gray-400 mt-6 mb-3">Current Context</h3>
-                    <div className="p-3 bg-gray-800/50 rounded-lg text-sm text-gray-400">
+                    <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mt-6 mb-3">Current Context</h3>
+                    <div className="p-3 bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-600 dark:text-gray-400">
                         <p className="text-xs text-gray-500 mb-1">Focus:</p>
-                        <p className="text-gray-300">Infrastructure-wide</p>
+                        <p className="text-gray-900 dark:text-gray-300">Infrastructure-wide</p>
                         <p className="text-xs text-gray-500 mt-2 mb-1">Active Alerts:</p>
-                        <p className="text-gray-300">3 incidents</p>
+                        <p className="text-gray-900 dark:text-gray-300">3 incidents</p>
                     </div>
                 </div>
             </div>
@@ -275,8 +273,8 @@ function MessageBubble({ message }: { message: ChatMessage }) {
     if (isSystem) {
         return (
             <div className="text-center text-sm text-gray-500 py-4">
-                <div className="inline-flex items-center gap-2 px-4 py-2 bg-gray-800/50 rounded-full">
-                    <SparklesIcon className="h-4 w-4 text-purple-400" />
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-800/50 rounded-full">
+                    <SparklesIcon className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                     {message.content}
                 </div>
             </div>
@@ -300,9 +298,9 @@ function MessageBubble({ message }: { message: ChatMessage }) {
     return (
         <div className="flex gap-3">
             <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500/20 to-blue-600/20 flex items-center justify-center">
-                <SparklesIcon className="h-4 w-4 text-purple-400" />
+                <SparklesIcon className="h-4 w-4 text-purple-600 dark:text-purple-400" />
             </div>
-            <div className="max-w-[70%] bg-gray-800 text-gray-100 rounded-2xl rounded-bl-sm px-4 py-3">
+            <div className="max-w-[70%] bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700 rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm">
                 <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                 <p className="text-xs text-gray-500 mt-1">
                     {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

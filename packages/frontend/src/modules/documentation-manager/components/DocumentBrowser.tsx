@@ -111,6 +111,7 @@ export default function DocumentBrowser({
     mutationFn: (id: string) => documentsApi.delete(id),
     onSuccess: (_, deletedId) => {
       queryClient.invalidateQueries({ queryKey: ['docs-documents'] });
+      queryClient.invalidateQueries({ queryKey: ['docs-folders'] });
       queryClient.invalidateQueries({ queryKey: ['docs-categories'] });
       onDocumentDeleted?.(deletedId);
       showSuccess('Document moved to trash');
@@ -124,6 +125,7 @@ export default function DocumentBrowser({
     mutationFn: (id: string) => documentsApi.restore(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['docs-documents'] });
+      queryClient.invalidateQueries({ queryKey: ['docs-folders'] });
       queryClient.invalidateQueries({ queryKey: ['docs-categories'] });
       showSuccess('Document restored successfully');
     },
@@ -136,6 +138,7 @@ export default function DocumentBrowser({
     mutationFn: (id: string) => documentsApi.permanentDelete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['docs-documents'] });
+      queryClient.invalidateQueries({ queryKey: ['docs-folders'] });
       queryClient.invalidateQueries({ queryKey: ['docs-categories'] });
       showSuccess('Document permanently deleted');
     },
@@ -403,6 +406,11 @@ export default function DocumentBrowser({
                     Draft
                   </span>
                 )}
+                {doc.status === 'ARCHIVED' && (
+                  <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400">
+                    Archived
+                  </span>
+                )}
                 <button
                   onClick={(e) => handleDelete(e, doc.id, doc.title)}
                   className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-all"
@@ -448,6 +456,30 @@ export default function DocumentBrowser({
   );
 
   const rootDocuments = documents.filter(d => !d.folder_id);
+
+  // Group trash documents by category
+  const trashGroups = viewMode === 'trash' ? Object.values(documents.reduce((acc, doc) => {
+    // Backend listDocuments might not return root category_id, but returns category object
+    const catId = doc.category?.id || doc.category_id || 'uncategorized';
+    if (!acc[catId]) {
+      acc[catId] = {
+        id: catId,
+        name: doc.category?.name || 'Uncategorized',
+        docs: []
+      };
+    }
+    acc[catId].docs.push(doc);
+    return acc;
+  }, {} as Record<string, { id: string, name: string, docs: DocumentListItem[] }>))
+    .sort((a: { id: string, name: string }, b: { id: string, name: string }) => {
+      const catA = categories.find(c => c.id === a.id);
+      const catB = categories.find(c => c.id === b.id);
+      // Sort by defined category order first, then alphabetical for others
+      if (catA && catB) return (catA.order || 0) - (catB.order || 0);
+      if (catA) return -1;
+      if (catB) return 1;
+      return a.name.localeCompare(b.name);
+    }) : [];
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800">
@@ -518,9 +550,18 @@ export default function DocumentBrowser({
       {/* Document Content */}
       <div className="flex-1 overflow-y-auto p-2">
         {viewMode === 'trash' ? (
-          <div className="space-y-1">
+          <div className="space-y-6">
             {documents.length > 0 ? (
-              documents.map(renderTrashItem)
+              trashGroups.map((group: { id: string, name: string, docs: DocumentListItem[] }) => (
+                <div key={group.id}>
+                  <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 px-3">
+                    {group.name}
+                  </h3>
+                  <div className="space-y-1">
+                    {group.docs.map(renderTrashItem)}
+                  </div>
+                </div>
+              ))
             ) : (
               <div className="text-center py-8 text-gray-400 text-sm">
                 Trash is empty
@@ -544,6 +585,11 @@ export default function DocumentBrowser({
                 {doc.status === 'DRAFT' && (
                   <span className="text-xs px-2 py-0.5 rounded bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
                     Draft
+                  </span>
+                )}
+                {doc.status === 'ARCHIVED' && (
+                  <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400">
+                    Archived
                   </span>
                 )}
                 <button

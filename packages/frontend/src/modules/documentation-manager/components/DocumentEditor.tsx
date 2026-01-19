@@ -42,6 +42,7 @@ export function DocumentEditor({ documentId, onClose, onSave }: DocumentEditorPr
   const [hasEmbedding, setHasEmbedding] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [isDirty, setIsDirty] = useState(!isEditMode); // New docs start dirty, edits start clean
+  const [creationSuccess, setCreationSuccess] = useState(false);
   const isInitialLoad = useRef(isEditMode); // Track if we're still loading in edit mode
 
   // Safe setter that respects initial load
@@ -140,8 +141,12 @@ export function DocumentEditor({ documentId, onClose, onSave }: DocumentEditorPr
     mutationFn: (data: CreateDocumentData) => documentsApi.create(data),
     onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ['docs-documents'] });
+      queryClient.invalidateQueries({ queryKey: ['docs-folders'] });
+      queryClient.invalidateQueries({ queryKey: ['docs-categories'] });
       // Keep popup open after create
       setIsDirty(false);
+      setCreationSuccess(true);
+      setTimeout(() => setCreationSuccess(false), 3000);
       onSave?.(response.data);
     },
     onError: (error: any) => {
@@ -155,6 +160,8 @@ export function DocumentEditor({ documentId, onClose, onSave }: DocumentEditorPr
     mutationFn: (data: UpdateDocumentData) => documentsApi.update(documentId!, data),
     onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: ['docs-documents'] });
+      queryClient.invalidateQueries({ queryKey: ['docs-folders'] });
+      queryClient.invalidateQueries({ queryKey: ['docs-categories'] });
       queryClient.invalidateQueries({ queryKey: ['docs-document', documentId] });
       queryClient.invalidateQueries({ queryKey: ['docs-versions', documentId] });
       // Don't close - keep popup open
@@ -178,7 +185,7 @@ export function DocumentEditor({ documentId, onClose, onSave }: DocumentEditorPr
         title,
         content,
         categoryId,
-        folderId: folderId || undefined,
+        folderId: folderId || null,
         status,
         tags,
         changeNote: changeNote || undefined,
@@ -188,7 +195,7 @@ export function DocumentEditor({ documentId, onClose, onSave }: DocumentEditorPr
         title,
         content,
         categoryId,
-        folderId: folderId || undefined,
+        folderId: folderId || null,
         status,
         tags,
       });
@@ -311,11 +318,23 @@ export function DocumentEditor({ documentId, onClose, onSave }: DocumentEditorPr
 
             <button
               onClick={handleSave}
-              disabled={!title.trim() || !content.trim() || !categoryId || createMutation.isPending || updateMutation.isPending || (isEditMode && !isDirty)}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed rounded-lg transition-colors"
+              disabled={!title.trim() || !content.trim() || !categoryId || createMutation.isPending || updateMutation.isPending || (isEditMode && !isDirty) || creationSuccess}
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors ${creationSuccess
+                ? 'bg-green-600 cursor-not-allowed'
+                : 'bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed'
+                }`}
             >
-              <DocumentCheckIcon className="h-4 w-4" />
-              {isEditMode ? (isDirty ? 'Update' : 'Saved') : 'Create'}
+              {creationSuccess ? (
+                <>
+                  <DocumentCheckIcon className="h-4 w-4" />
+                  Created
+                </>
+              ) : (
+                <>
+                  <DocumentCheckIcon className="h-4 w-4" />
+                  {isEditMode ? (isDirty ? 'Update' : 'Saved') : 'Create'}
+                </>
+              )}
             </button>
             <button
               onClick={onClose}
@@ -408,7 +427,7 @@ export function DocumentEditor({ documentId, onClose, onSave }: DocumentEditorPr
             </div>
 
             {/* Forge AI Access (edit mode only) */}
-            {isEditMode && (
+            {isEditMode && status === 'PUBLISHED' && (
               <div className="border border-purple-200 dark:border-purple-800 rounded-lg p-4 bg-purple-50 dark:bg-purple-900/20">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
