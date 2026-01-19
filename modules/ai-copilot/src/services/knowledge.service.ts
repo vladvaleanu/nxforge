@@ -40,8 +40,8 @@ export class KnowledgeService {
         this.prisma = config.prisma;
         this.embedding = config.embedding;
         this.logger = config.logger;
-        this.topK = config.topK || 5;
-        this.minSimilarity = config.minSimilarity || 0.3;
+        this.topK = config.topK || 8;  // Increased from 5 for more context
+        this.minSimilarity = config.minSimilarity || 0.25;  // Lowered from 0.3 to include more results
     }
 
     /**
@@ -96,7 +96,7 @@ export class KnowledgeService {
 
         // Format documents for LLM context
         const formattedContext = documents.map((doc, i) => {
-            const preview = doc.excerpt || doc.content.substring(0, 50000);
+            const preview = doc.content;  // Use full content for better context
             return `[Document ${i + 1}: ${doc.title} (${doc.categoryName})]
 ${preview}${preview.length < doc.content.length ? '...' : ''}`;
         }).join('\n\n---\n\n');

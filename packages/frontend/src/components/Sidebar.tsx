@@ -72,6 +72,7 @@ const CORE_MENU: MenuItem[] = [
       { label: 'Jobs', path: '/jobs', icon: Clock },
       { label: 'Executions', path: '/executions', icon: Play },
       { label: 'Events', path: '/events', icon: Radio },
+      { label: 'Alert Rules', path: '/incidents/rules', icon: Bell },
     ],
   },
 ];
@@ -176,7 +177,7 @@ function Sidebar() {
     <div className="flex h-screen w-64 flex-col bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 border-r border-gray-200 dark:border-gray-800">
       {/* Logo / Brand */}
       <div className="flex h-16 items-center justify-between border-b border-gray-200 dark:border-gray-800 px-6">
-        <h1 className="text-xl font-bold text-blue-600 dark:text-blue-400">NxForge</h1>
+        <h1 className="text-xl font-bold text-blue-600 dark:text-blue-400">NXFORGE</h1>
 
         {/* Theme Toggle */}
         <button

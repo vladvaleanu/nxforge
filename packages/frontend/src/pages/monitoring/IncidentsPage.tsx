@@ -1,119 +1,82 @@
 /**
  * IncidentsPage - Core Monitoring Page
  * Displays the Situation Deck for live incident monitoring
+ * Phase 3: Connected to real API via AlertBatcherService
  */
 
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Incident } from '../../types/monitoring.types';
 import { IncidentCard } from '../../components/monitoring/IncidentCard';
+import { forgeApi, IncidentListItem } from '../../modules/ai-copilot/api';
 import {
     ListBulletIcon,
     Squares2X2Icon,
     BellAlertIcon,
     SparklesIcon,
     ArrowPathIcon,
+    ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 
-// Mock data for Phase 1 - will be replaced with real API calls
-const MOCK_INCIDENTS: Incident[] = [
-    {
-        id: '1',
-        title: 'Multiple PDU Failures Detected',
-        severity: 'critical',
-        status: 'active',
-        impact: 'Affects 12 Racks across Zone A',
-        duration: '4m 20s',
-        alertCount: 8,
-        hasForgeAnalysis: true,
-        createdAt: new Date(Date.now() - 260000),
-        alerts: [
-            {
-                id: 'a1',
-                source: 'pdu-monitor',
-                message: 'PDU-A1-01 voltage drop below threshold (198V)',
-                timestamp: new Date(Date.now() - 260000),
-                labels: { rack: 'A1', pdu: 'PDU-01' },
-            },
-            {
-                id: 'a2',
-                source: 'pdu-monitor',
-                message: 'PDU-A1-02 current spike detected (32A)',
-                timestamp: new Date(Date.now() - 240000),
-                labels: { rack: 'A1', pdu: 'PDU-02' },
-            },
-            {
-                id: 'a3',
-                source: 'ups-monitor',
-                message: 'UPS Zone-A battery discharge initiated',
-                timestamp: new Date(Date.now() - 220000),
-                labels: { zone: 'A', device: 'UPS-01' },
-            },
-        ],
-    },
-    {
-        id: '2',
-        title: 'Cooling Efficiency Degraded',
-        severity: 'warning',
-        status: 'investigating',
-        impact: 'Zone B temperature rising (+2.3°C)',
-        duration: '12m 45s',
-        alertCount: 4,
-        hasForgeAnalysis: true,
-        createdAt: new Date(Date.now() - 765000),
-        alerts: [
-            {
-                id: 'b1',
-                source: 'hvac-monitor',
-                message: 'CRAC-B2 supply temperature above setpoint',
-                timestamp: new Date(Date.now() - 765000),
-                labels: { zone: 'B', unit: 'CRAC-B2' },
-            },
-            {
-                id: 'b2',
-                source: 'sensor-grid',
-                message: 'Hot aisle temperature rising: Row B-4',
-                timestamp: new Date(Date.now() - 600000),
-                labels: { zone: 'B', row: 'B-4' },
-            },
-        ],
-    },
-    {
-        id: '3',
-        title: 'Network Switch Port Errors',
-        severity: 'info',
-        status: 'active',
-        impact: 'ToR switch in Rack C-12',
-        duration: '2m 10s',
-        alertCount: 2,
-        hasForgeAnalysis: false,
-        createdAt: new Date(Date.now() - 130000),
-        alerts: [
-            {
-                id: 'c1',
-                source: 'network-monitor',
-                message: 'Interface Eth1/24 CRC errors increasing',
-                timestamp: new Date(Date.now() - 130000),
-                labels: { rack: 'C-12', switch: 'ToR-C12', port: 'Eth1/24' },
-            },
-        ],
-    },
-];
-
 type ViewMode = 'summary' | 'expanded';
+
+/**
+ * Transform API incident to frontend Incident type
+ */
+function transformIncident(apiIncident: IncidentListItem): Incident {
+    return {
+        id: apiIncident.id,
+        title: apiIncident.title,
+        severity: apiIncident.severity,
+        status: apiIncident.status as Incident['status'],
+        impact: apiIncident.impact,
+        duration: apiIncident.duration,
+        alertCount: apiIncident.alertCount,
+        hasForgeAnalysis: apiIncident.hasForgeAnalysis,
+        createdAt: new Date(apiIncident.createdAt),
+    };
+}
 
 export default function IncidentsPage() {
     const [viewMode, setViewMode] = useState<ViewMode>('summary');
     const [expandedIncidentId, setExpandedIncidentId] = useState<string | null>(null);
-    const [incidents, setIncidents] = useState<Incident[]>(MOCK_INCIDENTS);
-    const [isRefreshing, setIsRefreshing] = useState(false);
+    const queryClient = useQueryClient();
+
+    // Fetch incidents with auto-refresh
+    const {
+        data: incidentsResponse,
+        isLoading,
+        isError,
+        error,
+        refetch,
+        isRefetching,
+    } = useQuery({
+        queryKey: ['incidents', 'active'],
+        queryFn: () => forgeApi.getIncidents('active'),
+        refetchInterval: 5000, // Refresh every 5 seconds
+        staleTime: 2000,
+    });
+
+    // Mutation for dismissing incidents
+    const dismissMutation = useMutation({
+        mutationFn: (incidentId: string) =>
+            forgeApi.updateIncident(incidentId, { status: 'dismissed' }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['incidents'] });
+        },
+    });
+
+    const incidents: Incident[] = incidentsResponse?.success
+        ? incidentsResponse.incidents.map(transformIncident)
+        : [];
 
     const handleExpand = (incidentId: string) => {
         setExpandedIncidentId(prev => (prev === incidentId ? null : incidentId));
     };
 
     const handleDismiss = (incidentId: string) => {
-        setIncidents(prev => prev.filter(i => i.id !== incidentId));
+        dismissMutation.mutate(incidentId);
     };
 
     const handleChatWithForge = (incident: Incident) => {
@@ -123,12 +86,7 @@ export default function IncidentsPage() {
     };
 
     const handleRefresh = () => {
-        setIsRefreshing(true);
-        // Simulate refresh
-        setTimeout(() => {
-            setIncidents(MOCK_INCIDENTS);
-            setIsRefreshing(false);
-        }, 1000);
+        refetch();
     };
 
     const criticalCount = incidents.filter(i => i.severity === 'critical').length;
@@ -172,7 +130,7 @@ export default function IncidentsPage() {
                                     {infoCount} Info
                                 </span>
                             )}
-                            {incidents.length === 0 && (
+                            {!isLoading && incidents.length === 0 && (
                                 <span className="px-2.5 py-1 text-xs font-medium bg-green-500 text-white rounded-full">
                                     All Clear
                                 </span>
@@ -184,10 +142,10 @@ export default function IncidentsPage() {
                         {/* Refresh Button */}
                         <button
                             onClick={handleRefresh}
-                            disabled={isRefreshing}
+                            disabled={isRefetching}
                             className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors disabled:opacity-50"
                         >
-                            <ArrowPathIcon className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                            <ArrowPathIcon className={`h-4 w-4 ${isRefetching ? 'animate-spin' : ''}`} />
                             Refresh
                         </button>
 
@@ -233,7 +191,36 @@ export default function IncidentsPage() {
 
             {/* Incidents List */}
             <div className="flex-1 overflow-y-auto p-6">
-                {incidents.length === 0 ? (
+                {isLoading ? (
+                    <div className="flex items-center justify-center h-full">
+                        <div className="text-center">
+                            <div className="w-12 h-12 mx-auto mb-4 border-4 border-gray-200 border-t-purple-600 rounded-full animate-spin" />
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                                Loading incidents...
+                            </p>
+                        </div>
+                    </div>
+                ) : isError ? (
+                    <div className="flex items-center justify-center h-full">
+                        <div className="text-center">
+                            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 dark:bg-red-900/20 flex items-center justify-center">
+                                <ExclamationTriangleIcon className="h-8 w-8 text-red-600 dark:text-red-400" />
+                            </div>
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
+                                Failed to Load Incidents
+                            </h3>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                                {(error as Error)?.message || 'Unable to fetch incidents'}
+                            </p>
+                            <button
+                                onClick={() => refetch()}
+                                className="px-4 py-2 text-sm font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                            >
+                                Try Again
+                            </button>
+                        </div>
+                    </div>
+                ) : incidents.length === 0 ? (
                     <div className="flex items-center justify-center h-full">
                         <div className="text-center">
                             <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
@@ -265,3 +252,4 @@ export default function IncidentsPage() {
         </div>
     );
 }
+

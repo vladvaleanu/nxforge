@@ -1,12 +1,14 @@
 /**
  * ForgeGlobalChat - Persistent floating chat widget
  * Available on all pages, can be minimized or expanded
+ * Phase 4: Connected to real Ollama API with streaming
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ChatMessage } from '../../modules/ai-copilot/types';
+import { forgeApi } from '../../modules/ai-copilot/api';
 import { modulesApi } from '../../api/modules';
 import { ModuleStatus } from '../../types/module.types';
 import {
@@ -17,6 +19,7 @@ import {
     ArrowsPointingInIcon,
     PaperAirplaneIcon,
     Cog6ToothIcon,
+    ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 
 // Chat storage key for persistence
@@ -67,6 +70,8 @@ interface ChatState {
     isExpanded: boolean;
 }
 
+type ConnectionStatus = 'connected' | 'disconnected' | 'reconnecting';
+
 export function ForgeGlobalChat() {
     const location = useLocation();
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -80,8 +85,44 @@ export function ForgeGlobalChat() {
         retry: 1,
     });
 
+    // Check Ollama connection status
+    const { data: health, refetch: refetchHealth } = useQuery({
+        queryKey: ['forge-health'],
+        queryFn: () => forgeApi.getHealth(),
+        staleTime: 10000,
+        refetchInterval: 15000, // Check every 15 seconds
+        retry: 1,
+    });
+
     const aiCopilotModule = modules?.find(m => m.name === 'ai-copilot');
     const isAiCopilotEnabled = aiCopilotModule?.status === ModuleStatus.ENABLED;
+
+    // Connection status
+    const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connected');
+    const [retryCount, setRetryCount] = useState(0);
+
+    // Update connection status based on health check
+    useEffect(() => {
+        if (health?.ollama) {
+            setConnectionStatus('connected');
+            setRetryCount(0);
+        } else if (health && !health.ollama) {
+            setConnectionStatus('disconnected');
+        }
+    }, [health]);
+
+    // Auto-retry when disconnected
+    useEffect(() => {
+        if (connectionStatus === 'disconnected' && retryCount < 5) {
+            setConnectionStatus('reconnecting');
+            const timeout = Math.min(5000 * Math.pow(2, retryCount), 30000); // Exponential backoff
+            const timer = setTimeout(() => {
+                refetchHealth();
+                setRetryCount(prev => prev + 1);
+            }, timeout);
+            return () => clearTimeout(timer);
+        }
+    }, [connectionStatus, retryCount, refetchHealth]);
 
     // Chat visibility state
     const [chatState, setChatState] = useState<ChatState>(() => {
@@ -107,6 +148,7 @@ export function ForgeGlobalChat() {
 
     const [input, setInput] = useState('');
     const [isTyping, setIsTyping] = useState(false);
+    const [streamingContent, setStreamingContent] = useState('');
 
     // Persist messages
     useEffect(() => {
@@ -121,7 +163,7 @@ export function ForgeGlobalChat() {
     // Auto-scroll to bottom
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages, isTyping]);
+    }, [messages, isTyping, streamingContent]);
 
     // Focus input when opened
     useEffect(() => {
@@ -138,8 +180,8 @@ export function ForgeGlobalChat() {
         setChatState(prev => ({ ...prev, isExpanded: !prev.isExpanded }));
     }, []);
 
-    const handleSend = useCallback(() => {
-        if (!input.trim()) return;
+    const handleSend = useCallback(async () => {
+        if (!input.trim() || isTyping) return;
 
         const userMessage: ChatMessage = {
             id: `user-${Date.now()}`,
@@ -149,24 +191,59 @@ export function ForgeGlobalChat() {
         };
 
         setMessages(prev => [...prev, userMessage]);
+        const currentInput = input;
         setInput('');
         setIsTyping(true);
+        setStreamingContent('');
 
         // Get current page context for response
         const pageContext = getPageContext(location.pathname);
 
-        // Mock Forge response with page awareness
-        setTimeout(() => {
+        try {
+            // Use real Ollama API with streaming
+            const contextHint = `User is viewing: ${pageContext.name}`;
+            let fullResponse = '';
+
+            // Try streaming first
+            try {
+                for await (const chunk of forgeApi.chatStream(currentInput, contextHint)) {
+                    fullResponse += chunk;
+                    setStreamingContent(fullResponse);
+                }
+            } catch {
+                // Fallback to non-streaming
+                const response = await forgeApi.chat(currentInput, contextHint);
+                if (response.success && response.response) {
+                    fullResponse = response.response;
+                } else {
+                    throw new Error(response.error || 'Failed to get response');
+                }
+            }
+
             const forgeMessage: ChatMessage = {
                 id: `forge-${Date.now()}`,
                 role: 'forge',
-                content: getMockResponse(input, pageContext.name),
+                content: fullResponse,
                 timestamp: new Date(),
             };
             setMessages(prev => [...prev, forgeMessage]);
+            setConnectionStatus('connected');
+        } catch (error) {
+            console.error('Chat error:', error);
+            setConnectionStatus('disconnected');
+
+            const errorMessage: ChatMessage = {
+                id: `error-${Date.now()}`,
+                role: 'system',
+                content: '⚠️ Unable to reach Forge. Ollama may be disconnected.',
+                timestamp: new Date(),
+            };
+            setMessages(prev => [...prev, errorMessage]);
+        } finally {
             setIsTyping(false);
-        }, 1000 + Math.random() * 1000);
-    }, [input, location.pathname]);
+            setStreamingContent('');
+        }
+    }, [input, location.pathname, isTyping]);
 
     const handleClear = useCallback(() => {
         setMessages(INITIAL_MESSAGES);
@@ -177,6 +254,12 @@ export function ForgeGlobalChat() {
             e.preventDefault();
             handleSend();
         }
+    };
+
+    const handleRetryConnection = () => {
+        setRetryCount(0);
+        setConnectionStatus('reconnecting');
+        refetchHealth();
     };
 
     // Don't show if AI Copilot module is disabled or if on Forge module pages
@@ -197,8 +280,11 @@ export function ForgeGlobalChat() {
                 title="Open Forge Chat"
             >
                 <SparklesIcon className="h-6 w-6" />
-                {/* Notification dot */}
-                <span className="absolute top-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-gray-900" />
+                {/* Status indicator */}
+                <span className={`absolute top-0 right-0 w-3 h-3 rounded-full border-2 border-white dark:border-gray-900 ${connectionStatus === 'connected' ? 'bg-green-500' :
+                        connectionStatus === 'reconnecting' ? 'bg-yellow-500 animate-pulse' :
+                            'bg-red-500'
+                    }`} />
             </button>
         );
     }
@@ -224,7 +310,10 @@ export function ForgeGlobalChat() {
                     <div className="flex flex-col">
                         <div className="flex items-center gap-2">
                             <span className="font-semibold text-white text-sm">Forge</span>
-                            <span className="text-xs text-green-400">●</span>
+                            <span className={`text-xs ${connectionStatus === 'connected' ? 'text-green-400' :
+                                    connectionStatus === 'reconnecting' ? 'text-yellow-400' :
+                                        'text-red-400'
+                                }`}>●</span>
                         </div>
                         <span className={`text-xs ${pageContext.color}`}>
                             {pageContext.icon} {pageContext.name}
@@ -260,19 +349,43 @@ export function ForgeGlobalChat() {
                 </div>
             </div>
 
+            {/* Connection Warning Banner */}
+            {connectionStatus !== 'connected' && (
+                <div className="flex items-center justify-between px-4 py-2 bg-yellow-900/50 border-b border-yellow-800/50">
+                    <div className="flex items-center gap-2 text-yellow-300 text-xs">
+                        <ExclamationTriangleIcon className="h-4 w-4" />
+                        <span>
+                            {connectionStatus === 'reconnecting' ? 'Reconnecting to Ollama...' : 'Ollama disconnected'}
+                        </span>
+                    </div>
+                    <button
+                        onClick={handleRetryConnection}
+                        className="text-xs text-yellow-400 hover:text-yellow-200 transition-colors"
+                    >
+                        Retry
+                    </button>
+                </div>
+            )}
+
             {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
                 {messages.map((message) => (
                     <MessageBubble key={message.id} message={message} />
                 ))}
                 {isTyping && (
-                    <div className="flex items-center gap-2 text-gray-400 text-sm">
-                        <div className="flex gap-1">
-                            <span className="w-2 h-2 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '0ms' }} />
-                            <span className="w-2 h-2 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '150ms' }} />
-                            <span className="w-2 h-2 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+                    <div className="flex justify-start">
+                        <div className="max-w-[85%] rounded-2xl px-3 py-2 text-sm bg-gray-800 text-gray-100 rounded-bl-sm">
+                            {streamingContent || (
+                                <div className="flex items-center gap-2 text-gray-400">
+                                    <div className="flex gap-1">
+                                        <span className="w-2 h-2 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+                                        <span className="w-2 h-2 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+                                        <span className="w-2 h-2 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+                                    </div>
+                                    <span>Thinking...</span>
+                                </div>
+                            )}
                         </div>
-                        <span>Forge is thinking...</span>
                     </div>
                 )}
                 <div ref={messagesEndRef} />
@@ -288,11 +401,12 @@ export function ForgeGlobalChat() {
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={handleKeyDown}
                         placeholder="Ask Forge..."
-                        className="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        disabled={isTyping}
+                        className="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent disabled:opacity-50"
                     />
                     <button
                         onClick={handleSend}
-                        disabled={!input.trim()}
+                        disabled={!input.trim() || isTyping}
                         className="p-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:hover:bg-purple-600 text-white rounded-lg transition-colors"
                     >
                         <PaperAirplaneIcon className="h-4 w-4" />
@@ -328,7 +442,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
     return (
         <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
             <div
-                className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${isUser
+                className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap ${isUser
                     ? 'bg-purple-600 text-white rounded-br-sm'
                     : 'bg-gray-800 text-gray-100 rounded-bl-sm'
                     }`}
@@ -339,45 +453,5 @@ function MessageBubble({ message }: { message: ChatMessage }) {
     );
 }
 
-// Mock responses with page context awareness
-function getMockResponse(input: string, pageContext: string): string {
-    const lower = input.toLowerCase();
-
-    // Context-aware responses based on current page
-    if (lower.includes('where') && lower.includes('am i') || lower.includes('context') || lower.includes('page')) {
-        return `You're currently viewing the **${pageContext}** section. I can help with anything related to this area or any other infrastructure questions.`;
-    }
-
-    if (lower.includes('incident') || lower.includes('alert')) {
-        return `I see 2 active incidents in the Situation Deck: PDU_CLUSTER_A has critical alerts, and COOLING_ZONE_B shows warning-level temperature rise.\n\n📍 *Context: ${pageContext}*\n\nWould you like me to analyze either of these?`;
-    }
-
-    if (lower.includes('sop') || lower.includes('procedure')) {
-        return `I can help with SOPs. We have procedures for: Power Failover, Cooling Emergency, Network Incident Response, and Access Control.\n\n📍 *Context: ${pageContext}*\n\nWhich one do you need?`;
-    }
-
-    if (lower.includes('power')) {
-        return `Current power status:\n• Zone A: 78% capacity (normal)\n• Zone B: 92% capacity (elevated)\n\nThe high Zone B reading correlates with the PDU cluster alerts.\n\n📍 *Context: ${pageContext}*`;
-    }
-
-    if (lower.includes('help') || lower.includes('/help')) {
-        return `I can help with:\n• **Incidents** - analyze alerts and suggest actions\n• **SOPs** - find and explain procedures\n• **Infrastructure** - power, cooling, network status\n• **Knowledge** - search documentation\n\n📍 Currently viewing: **${pageContext}**`;
-    }
-
-    // Page-specific suggestions
-    if (pageContext === 'Incidents') {
-        return `You're viewing **Incidents** monitoring. I can see the active alerts on this page.\n\nAsk me to:\n• Analyze a specific incident\n• Suggest remediation steps\n• Find related SOPs\n• Explain the impact`;
-    }
-
-    if (pageContext === 'Jobs') {
-        return `I see you're viewing **Jobs**. I can help you understand job schedules, troubleshoot failures, or explain job configurations.\n\nWhat would you like to know?`;
-    }
-
-    if (pageContext === 'Power Monitoring') {
-        return `You're in **Power Monitoring**. I can analyze consumption trends, compare readings across endpoints, or alert you to anomalies.\n\nWhat would you like to explore?`;
-    }
-
-    return `I understand your question about "${input.substring(0, 40)}${input.length > 40 ? '...' : ''}"\n\n📍 *Context: ${pageContext}*\n\nIn Phase 2, I'll connect to Ollama to provide real AI analysis with RAG.`;
-}
-
 export default ForgeGlobalChat;
+

@@ -26,17 +26,17 @@ export interface Logger {
 
 // Module context for routes/plugin
 export interface ModuleContext {
-    module: {
-        id: string;
-        name: string;
-        version: string;
-        config?: Record<string, unknown>;
-    };
-    services: {
-        prisma: any;
-        logger: Logger;
-        browser: BrowserService;
-    };
+  module: {
+    id: string;
+    name: string;
+    version: string;
+    config?: Record<string, unknown>;
+  };
+  services: {
+    prisma: any;
+    logger: Logger;
+    browser: BrowserService;
+  };
 }
 
 // Job context provided by core job executor (matches core JobContext)
@@ -54,6 +54,13 @@ export interface JobContext {
     http: any;
     logger: Logger;
     database: any;
-    events: any;
+    events: EventBus;
   };
 }
+
+// Event Bus interface for emitting events
+export interface EventBus {
+  emit(event: string, payload: Record<string, any>): Promise<void>;
+  on(event: string, handler: (payload: any) => void | Promise<void>): void;
+}
+

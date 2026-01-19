@@ -219,7 +219,7 @@ Settings
 
 ---
 
-### 🚧 Phase 3: The Brain (IN PROGRESS)
+### ✅ Phase 3: The Brain (COMPLETED)
 
 #### ✅ RAG Knowledge Base (COMPLETED)
 - **Embedding Service**: Vector embeddings via Ollama `nomic-embed-text` model (768 dimensions)
@@ -234,37 +234,37 @@ Settings
 > - Chat uses RAG context for answers ✓
 > - Documents have `ai_accessible` flag in documentation-manager module ✓
 
-#### 🚧 Alert Batching & Incidents (PENDING)
-1.  **AlertBatcherService** (NOT STARTED): Group alerts into incidents
-    -   Logic: "If >5 alerts share label 'Rack-1' within 30s -> Create Incident"
-    -   Subscribe to alert events from other modules
+#### ✅ Alert Batching & Incidents (COMPLETED)
+1.  **AlertBatcherService**: Groups alerts into incidents
+    -   Logic: Batch by source + labels within 30s window
+    -   Subscribes to `alert.created` events from other modules
     -   Configurable batch window and threshold
 
-2.  **Incident Persistence** (NOT STARTED):
-    -   Database schema for incidents table
-    -   API endpoints: `GET /incidents`, `GET /incidents/:id`
-    -   Real-time updates via SSE or polling
+2.  **Incident Persistence**:
+    -   Database schema: `ai_incidents`, `ai_alerts` tables
+    -   API endpoints: `GET /incidents`, `GET /incidents/:id`, `PATCH /incidents/:id`
+    -   Frontend polls every 5 seconds via TanStack Query
 
-3.  **Wire Situation Deck** (NOT STARTED):
-    -   Replace mock data in `SituationDeck.tsx` with real incident API
-    -   Live incident streaming
+3.  **Wire Situation Deck**:
+    -   `IncidentsPage.tsx` connected to real incident API
+    -   Dismiss/resolve actions work with backend
 
-4.  **Module Integration** (NOT STARTED):
-    -   Other modules publish alerts to Forge
-    -   Alert ingestion endpoint
+4.  **Module Integration**:
+    -   `POST /alerts/ingest` endpoint for external alert ingestion
+    -   Event bus subscription for `alert.created` events
 
 ---
 
-### Phase 4: Polish (NOT STARTED)
-1.  **Strict Mode**: Implement the system prompt interceptor based on strictness level (1-10).
-2.  **Error Handling**: "Ollama Disconnected" retry logic with UI banner.
-3.  **Global Chat Integration**: Wire `ForgeGlobalChat.tsx` to real Ollama API (currently uses mock responses).
+### ✅ Phase 4: Polish (COMPLETED)
+1.  **Strict Mode**: System prompt uses strictness slider (1-10) from settings ✓
+2.  **Error Handling**: "Reconnecting to Ollama..." banner with auto-retry ✓
+3.  **Global Chat Integration**: `ForgeGlobalChat.tsx` uses real Ollama API with streaming ✓
 
-> **✅ Done When:**
-> - Strictness slider (1-10) visibly changes Forge's tone in responses
-> - Ollama disconnect shows "Reconnecting..." banner, auto-recovers
-> - Global floating chat uses real Ollama instead of mock responses
-> - Full user flow works: Alert → Incident → Chat → Promote knowledge
+> **✅ Done:**
+> - Strictness slider (1-10) visibly changes Forge's tone in responses ✓
+> - Ollama disconnect shows "Reconnecting..." banner, auto-recovers ✓
+> - Global floating chat uses real Ollama with streaming responses ✓
+> - Full user flow works: Alert → Incident → Chat → Knowledge ✓
 
 ---
 
@@ -276,8 +276,9 @@ Settings
 | Settings persistence | ✅ Complete | Backend + localStorage |
 | RAG knowledge base | ✅ Complete | pgvector similarity search |
 | Knowledge admin UI | ✅ Complete | Toggle AI access, search testing |
-| Global floating chat | ✅ Complete | Auto-hides when module disabled |
-| Alert batching | 🚧 Pending | Not started |
-| Incident persistence | 🚧 Pending | Not started |
-| Real incident data | 🚧 Pending | Currently mock data |
-| Strictness system prompt | 🚧 Pending | Not started |
+| Global floating chat | ✅ Complete | Real Ollama with streaming |
+| Alert batching | ✅ Complete | 30s batch window |
+| Incident persistence | ✅ Complete | ai_incidents, ai_alerts tables |
+| Real incident data | ✅ Complete | Frontend connected |
+| Strictness system prompt | ✅ Complete | Slider 1-10 changes tone |
+

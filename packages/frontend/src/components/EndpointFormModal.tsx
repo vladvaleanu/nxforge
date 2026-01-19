@@ -287,9 +287,87 @@ export default function EndpointFormModal({ endpoint, onClose, onSuccess }: Endp
 
                 {formData.authType === 'form' && (
                   <div className="space-y-4">
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                      Form-based authentication configuration (add as scraping steps below)
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Username
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.authConfig?.username || ''}
+                          onChange={(e) => setFormData({
+                            ...formData,
+                            authConfig: { ...formData.authConfig, username: e.target.value },
+                          })}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                          placeholder="admin"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Password
+                        </label>
+                        <input
+                          type="password"
+                          value={formData.authConfig?.password || ''}
+                          onChange={(e) => setFormData({
+                            ...formData,
+                            authConfig: { ...formData.authConfig, password: e.target.value },
+                          })}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
                     </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Username Selector (CSS)
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.authConfig?.usernameSelector || ''}
+                          onChange={(e) => setFormData({
+                            ...formData,
+                            authConfig: { ...formData.authConfig, usernameSelector: e.target.value },
+                          })}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                          placeholder="input[name='username']"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Password Selector (CSS)
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.authConfig?.passwordSelector || ''}
+                          onChange={(e) => setFormData({
+                            ...formData,
+                            authConfig: { ...formData.authConfig, passwordSelector: e.target.value },
+                          })}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                          placeholder="input[name='password']"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Submit Button Selector (CSS)
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.authConfig?.submitSelector || ''}
+                          onChange={(e) => setFormData({
+                            ...formData,
+                            authConfig: { ...formData.authConfig, submitSelector: e.target.value },
+                          })}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                          placeholder="button[type='submit']"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      If selectors are left empty, default selectors will be used (input[name='username'], input[name='password'], button[type='submit'])
+                    </p>
                   </div>
                 )}
               </div>

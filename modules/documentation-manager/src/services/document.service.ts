@@ -13,7 +13,7 @@ interface CreateDocumentData {
   title: string;
   content: string;
   categoryId: string;
-  folderId?: string;
+  folderId?: string | null;
   authorId: string;
   status?: 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
   tags?: string[];

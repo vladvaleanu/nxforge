@@ -116,7 +116,7 @@ async function processEndpoint(
   screenshotOnError: boolean,
   results: ProcessingResults
 ): Promise<void> {
-  const { prisma, browser: browserService, logger } = context.services;
+  const { prisma, browser: browserService, logger, events } = context.services;
   const startTime = Date.now();
 
   try {
@@ -208,12 +208,43 @@ async function processEndpoint(
       `[CollectConsumption] Successfully scraped ${endpoint.name}: ${result.value} kWh (current month: ${currentKwh.toFixed(2)} kWh)`
     );
 
+    // Emit metric event for alert rules evaluation
+    if (events) {
+      await events.emit('metric.collected', {
+        source: 'consumption-monitor',
+        type: 'metric.collected',
+        endpointId: endpoint.id,
+        endpointName: endpoint.name,
+        totalKwh: result.value,
+        currentKwh,
+        power: result.additionalData?.power,
+        voltage: result.additionalData?.voltage,
+        current: result.additionalData?.current,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
     results.successful++;
   } catch (error: any) {
     logger.error(`[CollectConsumption] Failed to scrape ${endpoint.name}: ${error.message}`, {
       endpointId: endpoint.id,
       error,
     });
+
+    // Emit error event for alert rules evaluation
+    if (events) {
+      await events.emit('alert.created', {
+        source: 'consumption-monitor',
+        type: 'error',
+        message: `Failed to collect data from ${endpoint.name}: ${error.message}`,
+        severity: 'warning',
+        labels: {
+          endpointId: endpoint.id,
+          endpointName: endpoint.name,
+          errorType: 'scraping_failure',
+        },
+      });
+    }
 
     // Store failed reading
     try {
@@ -240,3 +271,4 @@ async function processEndpoint(
     });
   }
 }
+

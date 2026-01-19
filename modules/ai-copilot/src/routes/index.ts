@@ -7,9 +7,11 @@
 
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { ModuleContext, ChatRequest, HealthResponse, AiConfig } from '../types/index.js';
+import type { AlertRuleRequest } from '../types/alert.types.js';
 import { OllamaService } from '../services/ollama.service.js';
 import { EmbeddingService } from '../services/embedding.service.js';
 import { KnowledgeService } from '../services/knowledge.service.js';
+import { AlertRuleService } from '../services/alert-rule.service.js';
 
 // In-memory cache for config (will be replaced with DB read)
 let cachedConfig: AiConfig | null = null;
@@ -121,7 +123,7 @@ export async function registerRoutes(
     /**
      * GET /health - Health check with Ollama status
      */
-    fastify.get('/health', async (_request, reply): Promise<HealthResponse> => {
+    fastify.get('/health', async (_request, _reply): Promise<HealthResponse> => {
         const ollama = await getOllamaService(context);
         const config = await getConfig(context);
         const health = await ollama.healthCheck();
@@ -166,7 +168,7 @@ export async function registerRoutes(
     /**
      * GET /settings - Get current AI configuration
      */
-    fastify.get('/settings', async (_request, reply) => {
+    fastify.get('/settings', async (_request, _reply) => {
         const config = await getConfig(context);
         return {
             success: true,
@@ -455,6 +457,410 @@ export async function registerRoutes(
         }
     });
 
+    // ==========================================
+    // INCIDENT & ALERT ENDPOINTS (Phase 3)
+    // ==========================================
+
+    /**
+     * GET /incidents - List all incidents
+     */
+    fastify.get('/incidents', async (request: FastifyRequest, reply) => {
+        const { status, limit } = request.query as { status?: string; limit?: string };
+        const { prisma } = context.services;
+
+        try {
+            let query = `
+                SELECT * FROM ai_incidents
+            `;
+            const conditions: string[] = [];
+
+            if (status === 'active') {
+                conditions.push(`status IN ('active', 'investigating')`);
+            } else if (status === 'resolved') {
+                conditions.push(`status IN ('resolved', 'dismissed')`);
+            }
+
+            if (conditions.length > 0) {
+                query += ` WHERE ${conditions.join(' AND ')}`;
+            }
+
+            query += `
+                ORDER BY
+                    CASE status
+                        WHEN 'active' THEN 1
+                        WHEN 'investigating' THEN 2
+                        ELSE 3
+                    END,
+                    CASE severity
+                        WHEN 'critical' THEN 1
+                        WHEN 'warning' THEN 2
+                        ELSE 3
+                    END,
+                    created_at DESC
+                LIMIT ${parseInt(limit || '50')}
+            `;
+
+            const incidents = await prisma.$queryRawUnsafe<{
+                id: string;
+                title: string;
+                severity: string;
+                status: string;
+                impact: string | null;
+                alert_count: number;
+                has_forge_analysis: boolean;
+                created_at: Date;
+                updated_at: Date;
+                resolved_at: Date | null;
+            }[]>(query);
+
+            // Calculate duration for each incident
+            const now = new Date();
+
+            return {
+                success: true,
+                incidents: incidents.map(i => {
+                    const diffMs = now.getTime() - new Date(i.created_at).getTime();
+                    const diffSeconds = Math.floor(diffMs / 1000);
+                    const diffMinutes = Math.floor(diffSeconds / 60);
+                    const diffHours = Math.floor(diffMinutes / 60);
+
+                    let duration: string;
+                    if (diffHours > 0) {
+                        duration = `${diffHours}h ${diffMinutes % 60}m`;
+                    } else if (diffMinutes > 0) {
+                        duration = `${diffMinutes}m ${diffSeconds % 60}s`;
+                    } else {
+                        duration = `${diffSeconds}s`;
+                    }
+
+                    return {
+                        id: i.id,
+                        title: i.title,
+                        severity: i.severity,
+                        status: i.status,
+                        impact: i.impact || 'Unknown impact',
+                        alertCount: i.alert_count,
+                        hasForgeAnalysis: i.has_forge_analysis,
+                        duration,
+                        createdAt: i.created_at,
+                        updatedAt: i.updated_at,
+                        resolvedAt: i.resolved_at,
+                    };
+                }),
+            };
+        } catch (error) {
+            logger.error({ error }, 'Failed to fetch incidents');
+            reply.status(500);
+            return {
+                success: false,
+                error: 'Failed to fetch incidents',
+                incidents: [],
+            };
+        }
+    });
+
+    /**
+     * GET /incidents/:id - Get incident details with alerts
+     */
+    fastify.get('/incidents/:id', async (request: FastifyRequest, reply) => {
+        const { id } = request.params as { id: string };
+        const { prisma } = context.services;
+
+        try {
+            // Get incident
+            const incidents = await prisma.$queryRawUnsafe<{
+                id: string;
+                title: string;
+                severity: string;
+                status: string;
+                impact: string | null;
+                alert_count: number;
+                has_forge_analysis: boolean;
+                created_at: Date;
+                updated_at: Date;
+                resolved_at: Date | null;
+            }[]>(`SELECT * FROM ai_incidents WHERE id = $1::uuid`, id);
+
+            if (incidents.length === 0) {
+                reply.status(404);
+                return { success: false, error: 'Incident not found' };
+            }
+
+            const incident = incidents[0];
+
+            // Get related alerts
+            const alerts = await prisma.$queryRawUnsafe<{
+                id: string;
+                source: string;
+                message: string;
+                severity: string;
+                labels: Record<string, string>;
+                created_at: Date;
+            }[]>(
+                `SELECT id, source, message, severity, labels, created_at
+                 FROM ai_alerts WHERE incident_id = $1::uuid
+                 ORDER BY created_at DESC`,
+                id
+            );
+
+            // Calculate duration
+            const now = new Date();
+            const diffMs = now.getTime() - new Date(incident.created_at).getTime();
+            const diffSeconds = Math.floor(diffMs / 1000);
+            const diffMinutes = Math.floor(diffSeconds / 60);
+            const diffHours = Math.floor(diffMinutes / 60);
+
+            let duration: string;
+            if (diffHours > 0) {
+                duration = `${diffHours}h ${diffMinutes % 60}m`;
+            } else if (diffMinutes > 0) {
+                duration = `${diffMinutes}m ${diffSeconds % 60}s`;
+            } else {
+                duration = `${diffSeconds}s`;
+            }
+
+            return {
+                success: true,
+                incident: {
+                    id: incident.id,
+                    title: incident.title,
+                    severity: incident.severity,
+                    status: incident.status,
+                    impact: incident.impact || 'Unknown impact',
+                    alertCount: incident.alert_count,
+                    hasForgeAnalysis: incident.has_forge_analysis,
+                    duration,
+                    createdAt: incident.created_at,
+                    updatedAt: incident.updated_at,
+                    resolvedAt: incident.resolved_at,
+                    alerts: alerts.map(a => ({
+                        id: a.id,
+                        source: a.source,
+                        message: a.message,
+                        severity: a.severity,
+                        labels: a.labels,
+                        timestamp: a.created_at,
+                    })),
+                },
+            };
+        } catch (error) {
+            logger.error({ error, id }, 'Failed to fetch incident');
+            reply.status(500);
+            return { success: false, error: 'Failed to fetch incident' };
+        }
+    });
+
+    /**
+     * PATCH /incidents/:id - Update incident status
+     */
+    fastify.patch('/incidents/:id', async (request: FastifyRequest, reply) => {
+        const { id } = request.params as { id: string };
+        const body = request.body as { status?: string; hasForgeAnalysis?: boolean };
+        const { prisma } = context.services;
+
+        try {
+            const updates: string[] = [];
+            const values: any[] = [id];
+            let paramIndex = 2;
+
+            if (body.status) {
+                updates.push(`status = $${paramIndex++}`);
+                values.push(body.status);
+
+                // Set resolved_at if resolving/dismissing
+                if (body.status === 'resolved' || body.status === 'dismissed') {
+                    updates.push('resolved_at = NOW()');
+                }
+            }
+
+            if (body.hasForgeAnalysis !== undefined) {
+                updates.push(`has_forge_analysis = $${paramIndex++}`);
+                values.push(body.hasForgeAnalysis);
+            }
+
+            if (updates.length === 0) {
+                reply.status(400);
+                return { success: false, error: 'No updates provided' };
+            }
+
+            updates.push('updated_at = NOW()');
+
+            await prisma.$executeRawUnsafe(
+                `UPDATE ai_incidents SET ${updates.join(', ')} WHERE id = $1::uuid`,
+                ...values
+            );
+
+            logger.info({ id, updates: body }, 'Incident updated');
+
+            return { success: true, message: 'Incident updated' };
+        } catch (error) {
+            logger.error({ error, id }, 'Failed to update incident');
+            reply.status(500);
+            return { success: false, error: 'Failed to update incident' };
+        }
+    });
+
+    /**
+     * POST /alerts/ingest - Ingest a new alert (for testing or external sources)
+     */
+    fastify.post('/alerts/ingest', async (request: FastifyRequest, reply) => {
+        const body = request.body as {
+            source: string;
+            message: string;
+            severity?: string;
+            labels?: Record<string, string>;
+        };
+
+        if (!body.source || !body.message) {
+            reply.status(400);
+            return { success: false, error: 'source and message are required' };
+        }
+
+        try {
+            // Import alertBatcher from module index
+            const { alertBatcher } = await import('../index.js');
+
+            if (!alertBatcher) {
+                reply.status(503);
+                return { success: false, error: 'AlertBatcherService not initialized' };
+            }
+
+            const alert = await alertBatcher.ingestAlert({
+                source: body.source,
+                message: body.message,
+                severity: (body.severity as any) || 'info',
+                labels: body.labels || {},
+            });
+
+            logger.info({ alertId: alert.id, source: alert.source }, 'Alert ingested via API');
+
+            reply.status(201);
+            return {
+                success: true,
+                alert: {
+                    id: alert.id,
+                    source: alert.source,
+                    message: alert.message,
+                    severity: alert.severity,
+                    createdAt: alert.createdAt,
+                },
+            };
+        } catch (error) {
+            logger.error({ error }, 'Failed to ingest alert');
+            reply.status(500);
+            return { success: false, error: 'Failed to ingest alert' };
+        }
+    });
+
+    // ============================================
+    // Alert Rules API
+    // ============================================
+
+    const alertRuleService = new AlertRuleService(context.services.prisma, context.services.logger);
+
+    /**
+     * GET /alert-rules - List all alert rules
+     */
+    fastify.get('/alert-rules', async (_request, _reply) => {
+        const rules = await alertRuleService.getAllRules();
+        return { success: true, rules };
+    });
+
+    /**
+     * GET /alert-rules/:id - Get a specific alert rule
+     */
+    fastify.get('/alert-rules/:id', async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const rule = await alertRuleService.getRuleById(id);
+
+        if (!rule) {
+            return reply.status(404).send({ success: false, error: 'Rule not found' });
+        }
+
+        return { success: true, rule };
+    });
+
+    /**
+     * POST /alert-rules - Create a new alert rule
+     */
+    fastify.post('/alert-rules', async (request, reply) => {
+        try {
+            const body = request.body as AlertRuleRequest;
+            const rule = await alertRuleService.createRule(body);
+            return reply.status(201).send({ success: true, rule });
+        } catch (error) {
+            const err = error as Error;
+            return reply.status(400).send({ success: false, error: err.message });
+        }
+    });
+
+    /**
+     * PUT /alert-rules/:id - Update an alert rule
+     */
+    fastify.put('/alert-rules/:id', async (request, reply) => {
+        try {
+            const { id } = request.params as { id: string };
+            const body = request.body as Partial<AlertRuleRequest>;
+            const rule = await alertRuleService.updateRule(id, body);
+
+            if (!rule) {
+                return reply.status(404).send({ success: false, error: 'Rule not found' });
+            }
+
+            return { success: true, rule };
+        } catch (error) {
+            const err = error as Error;
+            return reply.status(400).send({ success: false, error: err.message });
+        }
+    });
+
+    /**
+     * PATCH /alert-rules/:id/toggle - Toggle rule enabled status
+     */
+    fastify.patch('/alert-rules/:id/toggle', async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const { enabled } = request.body as { enabled: boolean };
+
+        const rule = await alertRuleService.toggleRule(id, enabled);
+
+        if (!rule) {
+            return reply.status(404).send({ success: false, error: 'Rule not found' });
+        }
+
+        return { success: true, rule };
+    });
+
+    /**
+     * DELETE /alert-rules/:id - Delete an alert rule
+     */
+    fastify.delete('/alert-rules/:id', async (request, reply) => {
+        const { id } = request.params as { id: string };
+        const deleted = await alertRuleService.deleteRule(id);
+
+        if (!deleted) {
+            return reply.status(404).send({ success: false, error: 'Rule not found' });
+        }
+
+        return { success: true, message: 'Rule deleted' };
+    });
+
+    /**
+     * GET /alert-rules/sources - Get available event sources for dropdown
+     */
+    fastify.get('/alert-rules/sources', async (_request, _reply) => {
+        // Return list of known sources
+        const sources = [
+            { id: '*', name: 'All Sources' },
+            { id: 'core', name: 'Core System' },
+            { id: 'core-jobs', name: 'Core Jobs' },
+            { id: 'job-scheduler', name: 'Job Scheduler' },
+            { id: 'consumption-monitor', name: 'Consumption Monitor' },
+            { id: 'documentation-manager', name: 'Documentation Manager' },
+            { id: 'ai-copilot', name: 'AI Copilot' },
+        ];
+        return { success: true, sources };
+    });
+
     logger.info('[ai-copilot] Routes registered');
 }
 
@@ -501,8 +907,13 @@ Important rules:
 
 ${ragContext}
 
-When answering questions, prioritize information from the documentation provided above.
-If the documentation contains relevant procedures or policies, cite them in your response.`;
+CRITICAL INSTRUCTIONS FOR ANSWERING:
+- When answering questions about procedures or SOPs, you MUST list ALL steps from the documentation
+- Do NOT summarize or skip steps - include every single step in numbered order
+- Use exact wording from the documentation for button names, menu paths, and technical terms
+- If the documentation contains warnings or safety notes, mention them prominently
+- Format your response with clear numbered steps for procedures
+- Cite the document title/source when referencing documentation`;
     }
 
     prompt += `

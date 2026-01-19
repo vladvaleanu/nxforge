@@ -34,6 +34,7 @@ const HistoryPage = lazy(() => import('./pages/HistoryPage'));
 
 // Monitoring pages
 const IncidentsPage = lazy(() => import('./pages/monitoring/IncidentsPage'));
+const AlertRulesPage = lazy(() => import('./pages/monitoring/AlertRulesPage'));
 
 // Settings pages
 const SettingsProfilePage = lazy(() => import('./pages/SettingsProfilePage'));
@@ -200,6 +201,16 @@ function App() {
                       <ProtectedRoute>
                         <Layout>
                           <IncidentsPage />
+                        </Layout>
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/incidents/rules"
+                    element={
+                      <ProtectedRoute>
+                        <Layout>
+                          <AlertRulesPage />
                         </Layout>
                       </ProtectedRoute>
                     }

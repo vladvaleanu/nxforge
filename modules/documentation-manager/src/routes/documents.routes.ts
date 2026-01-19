@@ -12,7 +12,7 @@ const createDocumentSchema = z.object({
   title: z.string().min(1).max(500),
   content: z.string(),
   categoryId: z.string().uuid(),
-  folderId: z.string().uuid().optional(),
+  folderId: z.string().uuid().optional().nullable(),
   status: z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED']).optional(),
   tags: z.array(z.string()).optional(),
 });
